@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function OrderSuccess() { return <div className="mx-auto max-w-xl px-4 py-20 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-firouzeh/25 text-2xl text-firouzeh">✓</div><h1 className="mt-6 text-3xl font-extrabold">پرداخت با موفقیت انجام شد</h1><p className="mt-3 text-ink-soft">سفارش شما ثبت شد و وضعیت آن را می‌توانید پیگیری کنید.</p><Link href="/account/orders" className="mt-8 inline-flex min-h-11 items-center rounded-xl bg-lajvard px-6 text-white">مشاهده سفارش‌ها</Link></div>; }

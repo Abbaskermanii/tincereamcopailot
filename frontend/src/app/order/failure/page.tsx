@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function OrderFailure() { return <div className="mx-auto max-w-xl px-4 py-20 text-center"><h1 className="text-3xl font-extrabold">پرداخت انجام نشد</h1><p className="mt-3 text-ink-soft">تراکنش ناموفق بود؛ سبد خرید شما حفظ شده است.</p><Link href="/checkout" className="mt-8 inline-flex min-h-11 items-center rounded-xl bg-lajvard px-6 text-white">بازگشت به پرداخت</Link></div>; }

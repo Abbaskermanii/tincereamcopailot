@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Palette — kiln-grounded (see DESIGN.md) */
+  --lajvard: #31547a;
+  --lajvard-deep: #26415f;
+  --firouzeh: #7a9e93;
+  --kiln-clay: #b0764f;
+  --slip: #edeae3;
+  --slip-raised: #f6f4ef;
+  --char: #26221f;
+  --char-soft: #57514b;
+  --copper: #9c6b5e;
+
+  --bg: var(--slip);
+  --surface: var(--slip-raised);
+  --ink: var(--char);
+  --ink-soft: var(--char-soft);
+  --brand: var(--lajvard);
+  --accent: var(--firouzeh);
+  --warm: var(--kiln-clay);
+}
+
+.dark {
+  --bg: #1c1a18;
+  --surface: #262320;
+  --ink: #ece7df;
+  --ink-soft: #b3aa9e;
+  --brand: #8fb2d9;
+  --accent: #93b8ac;
+  --warm: #cf9270;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-feature-settings: "ss01";
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--brand) 80%, white);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+@layer components {
+  /* ——— «لبهٔ لعاب» the Glaze Edge: hand-thrown wobbly rim + settling sheen ——— */
+  .glaze-edge {
+    border-radius: 255px 18px 225px 18px / 18px 225px 18px 255px;
+    position: relative;
+    isolation: isolate;
+  }
+  .glaze-edge::after {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      color-mix(in srgb, var(--warm) 55%, transparent) 46%,
+      color-mix(in srgb, var(--brand) 45%, transparent) 54%,
+      transparent 70%
+    );
+    background-size: 300% 300%;
+    background-position: 100% 0;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    transition: background-position 700ms ease;
+    pointer-events: none;
+  }
+  .glaze-edge:hover::after,
+  .glaze-edge:focus-visible::after,
+  .glaze-edge.is-active::after {
+    background-position: 0 100%;
+  }
+
+  /* Kiln-door reveal: warm light sweep on first paint of imagery */
+  .kiln-reveal {
+    position: relative;
+    overflow: hidden;
+  }
+  .kiln-reveal::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: linear-gradient(
+      105deg,
+      rgba(176, 118, 79, 0.35),
+      rgba(237, 234, 227, 0.65) 45%,
+      transparent 60%
+    );
+    transform: translateX(-110%);
+    animation: kiln-sweep 900ms cubic-bezier(0.22, 1, 0.36, 1) 150ms forwards;
+  }
+  @keyframes kiln-sweep {
+    to {
+      transform: translateX(110%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .kiln-reveal::before {
+      display: none;
+    }
+  }
+
+  .num-latin {
+    direction: ltr;
+    unicode-bidi: isolate;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* thin elegant scrollbar for carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}

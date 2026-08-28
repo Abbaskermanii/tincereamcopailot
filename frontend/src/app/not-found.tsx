@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function NotFound() { return <div className="mx-auto flex min-h-[55vh] max-w-xl flex-col items-center justify-center px-4 text-center"><p className="num-latin text-7xl font-extrabold text-lajvard">۴۰۴</p><h1 className="mt-5 text-2xl font-bold">این قفسه خالی است</h1><p className="mt-3 text-ink-soft">صفحه‌ای که دنبال آن هستید پیدا نشد.</p><Link href="/shop" className="glaze-edge mt-7 inline-flex min-h-11 items-center rounded-xl bg-lajvard px-6 text-white">رفتن به فروشگاه</Link></div>; }

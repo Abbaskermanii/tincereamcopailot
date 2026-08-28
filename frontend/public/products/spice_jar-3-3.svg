@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+<defs>
+  <linearGradient id="bkg" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#EDEAE3"/>
+    <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.35"/>
+  </linearGradient>
+</defs>
+<rect width="800" height="800" fill="url(#bkg)"/>
+<circle cx="640" cy="160" r="120" fill="#C8B79B" opacity="0.35"/>
+
+<ellipse cx="400" cy="700" rx="210" ry="30" fill="#00000012"/>
+<rect x="360" y="220" width="80" height="70" rx="10" fill="#26415F"/>
+<path d="M340 290 L460 290 L460 320 C520 350 545 420 545 500 C545 620 490 690 400 690
+         C310 690 255 620 255 500 C255 420 280 350 340 320 Z" fill="#31547A"/>
+<rect x="330" y="205" width="140" height="34" rx="12" fill="#26415F"/>
+<circle cx="400" cy="470" r="60" fill="#C8B79B"/>
+<circle cx="400" cy="470" r="60" fill="none" stroke="#26415F" stroke-width="6" opacity="0.5"/>
+<g fill="#26415F">
+  <circle cx="385" cy="455" r="7"/><circle cx="415" cy="450" r="6"/><circle cx="398" cy="480" r="7"/>
+  <circle cx="376" cy="486" r="6"/><circle cx="422" cy="484" r="6"/>
+</g>
+
+<text x="400" y="770" font-family="Tahoma, sans-serif" font-size="30" fill="#00000066"
+      text-anchor="middle"></text>
+</svg>

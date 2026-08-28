@@ -1,0 +1,42 @@
+[project]
+name = "ceramics-backend"
+version = "1.0.0"
+description = "Handmade ceramics e-commerce backend (FastAPI)"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
+ignore = ["B008"]  # FastAPI Depends() in defaults is idiomatic
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+ignore_missing_imports = true
+# SQLAlchemy/SQLModel descriptors defeat static typing in places; scoped silencing:
+disable_error_code = [
+  "attr-defined",   # .ilike/.desc on mapped columns
+  "union-attr",
+  "list-item",
+  "call-overload",  # SQLModel Field(sa_type=...)
+  "arg-type",
+  "unused-ignore",  # ignore comments flip-flop between plugin versions
+]
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/", "scripts/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/main.py", "*/alembic/*", "app/admin/*"]
