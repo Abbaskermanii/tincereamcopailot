@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import { apiJson, authHeaders } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast-provider";
@@ -142,7 +143,7 @@ export function ProductVariantManager({
                     <td className="p-4 num-latin text-ink-soft">{variant.sku}</td>
                     <td className="p-4">
                       {variant.image_url ? (
-                        <img src={variant.image_url} alt={variant.name} className="h-10 w-10 rounded-xl object-cover" />
+                        <Image src={variant.image_url} alt={variant.name} width={40} height={40} unoptimized className="h-10 w-10 rounded-xl object-cover" />
                       ) : (
                         <div className="h-10 w-10 rounded-xl border border-dashed border-char/20 bg-slip dark:border-white/15 dark:bg-black/30 flex items-center justify-center">
                           <p className="text-[10px] text-ink-soft">بدون تصویر</p>

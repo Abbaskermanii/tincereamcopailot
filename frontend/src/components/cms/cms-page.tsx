@@ -18,14 +18,7 @@ async function fetchPage(slug: string): Promise<CmsPageData | null> {
   }
 }
 
-import DOMPurify from "dompurify";
-
-function sanitizeHtml(html: string): string {
-  if (typeof window === "undefined") {
-    return html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
-  }
-  return DOMPurify.sanitize(html);
-}
+import { sanitizeHtml } from "@/lib/sanitize";
 
 export async function CmsPage({ slug, fallbackTitle, fallbackContent }: { slug: string; fallbackTitle: string; fallbackContent: React.ReactNode }) {
   const page = await fetchPage(slug);

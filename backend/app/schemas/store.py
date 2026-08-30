@@ -32,6 +32,7 @@ class ProductImageOut(BaseModel):
     alt_text: str
     sort_order: int
     is_primary: bool
+    attribute_value_id: str | None = None
 
 
 class ProductListItem(BaseModel):
@@ -58,6 +59,27 @@ class ProductVariantOut(BaseModel):
     absolute_price: float | None
     stock_qty: int
     is_active: bool
+    attribute_value_ids: list[str] = []
+    attribute_values: list[dict] = []
+
+
+class AttributeValueOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    attribute_id: str
+    value: str
+    slug: str
+    swatch_image_url: str | None = None
+    sort_order: int = 0
+
+
+class AttributeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    slug: str
+    sort_order: int = 0
+    values: list[AttributeValueOut] = []
 
 
 class ProductDetail(ProductListItem):
@@ -74,6 +96,7 @@ class ProductDetail(ProductListItem):
     discount_percent: int = 0
     images: list[ProductImageOut]
     variants: list[ProductVariantOut] = []
+    attributes: list[AttributeOut] = []
 
 
 class ProductPage(BaseModel):
@@ -138,6 +161,13 @@ class OrderCreatedOut(OrderOut):
     payment_url: str
 
 
+class OrderStatusEventOut(BaseModel):
+    """One entry of an order's status history (sourced from OrderStatusHistory)."""
+
+    status: str
+    at: datetime
+
+
 class OrderStatusOut(BaseModel):
     order_number: str
     status: OrderStatus
@@ -152,6 +182,8 @@ class OrderStatusOut(BaseModel):
     carrier: str | None = None
     shipping_method_name: str | None = None
     items: list[OrderItemOut] = []
+    # backward-compatible addition: full status timeline for the tracking page
+    history: list[OrderStatusEventOut] = []
 
 
 # ---------- Coupons ----------

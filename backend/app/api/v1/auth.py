@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
@@ -26,17 +26,18 @@ from app.models import (
     User,
     WishlistItem,
 )
+from app.core.permissions import require_permission
 from app.services import notifier
 from app.services.rate_limit import rate_limit
+from app.services.storage import put_image
+
+# Re-export from deps.py for backward compatibility
+from app.api.v1.deps import ACCESS_COOKIE, REFRESH_COOKIE, bearer, current_user, admin_user, optional_user
 
 router = APIRouter(prefix="/auth")
 users_router = APIRouter(prefix="/users")
 admin_router = APIRouter(prefix="/admin")
 wishlist_router = APIRouter(prefix="/wishlist")
-bearer = HTTPBearer(auto_error=False)
-
-ACCESS_COOKIE = "tinceram_access"
-REFRESH_COOKIE = "tinceram_refresh"
 
 
 class RegisterIn(BaseModel):
@@ -72,6 +73,7 @@ class OtpRequestIn(BaseModel):
 class OtpVerifyIn(BaseModel):
     phone: str = Field(pattern=r"^09\d{9}$")
     code: str = Field(min_length=4, max_length=8)
+    purpose: OtpPurpose = OtpPurpose.login
     full_name: str = ""
 
 
@@ -153,54 +155,8 @@ def _tokens(user: User, session: Session, response: Response | None = None) -> d
     return tokens
 
 
-def _resolve_token(
-    credentials: HTTPAuthorizationCredentials | None,
-    request: Request,
-) -> str | None:
-    if credentials:
-        return credentials.credentials
-    return request.cookies.get(ACCESS_COOKIE)
-
-
-def current_user(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    session: Session = Depends(get_session),
-) -> User:
-    token = _resolve_token(credentials, request)
-    if not token:
-        raise HTTPException(401, "احراز هویت لازم است.", headers={"WWW-Authenticate": "Bearer"})
-    try:
-        payload = decode_token(token)
-    except Exception as exc:
-        raise HTTPException(401, "توکن نامعتبر است.") from exc
-    user = session.get(User, payload["sub"])
-    if not user or not user.is_active:
-        raise HTTPException(401, "کاربر یافت نشد.")
-    return user
-
-
-def optional_user(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
-    session: Session = Depends(get_session),
-) -> User | None:
-    """Like current_user but returns None for guests (used by guest checkout)."""
-    token = _resolve_token(credentials, request)
-    if not token:
-        return None
-    try:
-        payload = decode_token(token)
-    except Exception:
-        return None
-    user = session.get(User, payload["sub"])
-    return user if user and user.is_active else None
-
-
-def admin_user(user: User = Depends(current_user)) -> User:
-    if not user.is_admin:
-        raise HTTPException(403, "دسترسی مدیر لازم است.")
-    return user
+# _resolve_token, current_user, optional_user, admin_user are defined in deps.py
+# and re-exported above for backward compatibility.
 
 
 @router.post("/register", status_code=201, dependencies=[Depends(rate_limit("register", 10, 3600))])
@@ -424,6 +380,39 @@ def update_profile(payload: ProfileUpdate, user: User = Depends(current_user), s
     return user
 
 
+@users_router.post("/me/avatar", status_code=201)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    allowed = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    content_type = file.content_type or ""
+    if content_type not in allowed:
+        raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود (JPG، PNG یا WebP).")
+    data = await file.read()
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(413, "حجم تصویر باید کمتر از ۲ مگابایت باشد.")
+    if len(data) == 0:
+        raise HTTPException(400, "فایل خالی است.")
+    extension = allowed[content_type]
+    object_name = f"avatars/{user.id}/{secrets.token_hex(12)}.{extension}"
+    url = put_image(object_name, data, content_type)
+    user.avatar_url = url
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return {"avatar_url": url}
+
+
+@users_router.delete("/me/avatar")
+def delete_avatar(user: User = Depends(current_user), session: Session = Depends(get_session)):
+    user.avatar_url = None
+    session.add(user)
+    session.commit()
+    return {"ok": True}
+
+
 @router.get("/users/me")
 def user_me(user: User = Depends(current_user)):
     return user
@@ -459,12 +448,13 @@ def _add_address(payload: AddressIn, user: User, session: Session) -> Address:
 
 # ---------- Admin: user management ----------
 
-@router.get("/users", dependencies=[Depends(admin_user)])
+
+@router.get("/users", dependencies=[Depends(require_permission("users"))])
 def list_users(session: Session = Depends(get_session), offset: int = 0, limit: int = 50):
     return session.exec(select(User).offset(offset).limit(min(limit, 100))).all()
 
 
-@router.delete("/users/{user_id}", dependencies=[Depends(admin_user)])
+@router.delete("/users/{user_id}", dependencies=[Depends(require_permission("users"))])
 def delete_user(user_id: str, session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
@@ -476,14 +466,14 @@ def delete_user(user_id: str, session: Session = Depends(get_session)):
 
 
 @admin_router.get("/users")
-def admin_users(_: User = Depends(admin_user), session: Session = Depends(get_session), offset: int = 0, limit: int = 50):
+def admin_users(_: User = Depends(require_permission("users")), session: Session = Depends(get_session), offset: int = 0, limit: int = 50):
     return session.exec(select(User).offset(offset).limit(min(limit, 100))).all()
 
 
 @admin_router.patch("/users/{user_id}")
 def admin_update_user(
     user_id: str, payload: UserUpdate,
-    admin: User = Depends(admin_user), session: Session = Depends(get_session),
+    admin: User = Depends(require_permission("users")), session: Session = Depends(get_session),
 ):
     user = session.get(User, user_id)
     if not user:

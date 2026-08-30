@@ -4,22 +4,27 @@ import { useState } from "react";
 import { ScrollText, Plus } from "lucide-react";
 import { ConfirmDialog, DataTable, DateInput, EmptyState, Field, FormActions, Modal, PageHeader, Pagination, TextInput, TextArea, Toolbar } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
 import { toPersianDigits } from "@/lib/format";
+import Image from "next/image";
 import { mediaUrl } from "@/lib/api";
 
 interface Article {
   id: string; title: string; slug: string; excerpt: string | null;
-  body: string; published_at: string | null; is_published: boolean;
+  body: string; published_at: string | null; is_published: boolean; is_featured: boolean;
   meta_title: string | null; meta_description: string | null;
   cover_url: string | null; category_id: string | null; category_name?: string | null;
+  view_count?: number; reading_time_minutes?: number;
+  tags?: Array<{ id: string; name: string; slug: string }>;
 }
 
 interface ArticleForm {
   title: string; slug: string; excerpt: string; body: string;
-  published_at: string; is_published: boolean;
+  published_at: string; is_published: boolean; is_featured: boolean;
   meta_title: string; meta_description: string;
   cover_url: string | null; category_id: string;
+  tag_slugs: string;
 }
 
 export default function AdminArticlesPage() {
@@ -28,7 +33,7 @@ export default function AdminArticlesPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState<Article | null>(null);
-  const [form, setForm] = useState<ArticleForm>({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", cover_url: null, category_id: "" });
+  const [form, setForm] = useState<ArticleForm>({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, is_featured: false, meta_title: "", meta_description: "", cover_url: null, category_id: "", tag_slugs: "" });
 
   const { data: articles, loading, reload } = useAdminResource<Article[]>("/admin/articles");
   const { data: articleCategories } = useAdminResource<Array<{ id: string; name: string; slug: string }>>("/admin/article-categories");
@@ -41,14 +46,17 @@ export default function AdminArticlesPage() {
     return true;
   });
 
-  const openCreate = () => { setForm({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", cover_url: null, category_id: "" }); setCreating(true); };
-  const openEdit = (a: Article) => { setForm({ title: a.title, slug: a.slug, excerpt: a.excerpt ?? "", body: a.body, published_at: a.published_at ? a.published_at.slice(0, 10) : "", is_published: a.is_published, meta_title: a.meta_title ?? "", meta_description: a.meta_description ?? "", cover_url: a.cover_url ?? null, category_id: a.category_id ?? "" }); setEditing(a); };
+  const openCreate = () => { setForm({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, is_featured: false, meta_title: "", meta_description: "", cover_url: null, category_id: "", tag_slugs: "" }); setCreating(true); };
+  const openEdit = (a: Article) => { setForm({ title: a.title, slug: a.slug, excerpt: a.excerpt ?? "", body: a.body, published_at: a.published_at ? a.published_at.slice(0, 10) : "", is_published: a.is_published, is_featured: Boolean((a as unknown as Article).is_featured), meta_title: a.meta_title ?? "", meta_description: a.meta_description ?? "", cover_url: a.cover_url ?? null, category_id: a.category_id ?? "", tag_slugs: (a.tags ?? []).map((t) => t.slug).join(", ") }); setEditing(a); };
 
   const submit = async () => {
-    const body = { ...form, published_at: form.published_at || null, cover_url: form.cover_url || null, category_id: form.category_id || null };
+    const tag_slugs = form.tag_slugs.split(",").map((s) => s.trim()).filter(Boolean);
+    const body = { ...form, tag_slugs, published_at: form.published_at || null, cover_url: form.cover_url || null, category_id: form.category_id || null };
+    // Remove raw tag_slugs string, keep array
+    const payload = { ...body, tag_slugs };
     const ok = editing
-      ? await mutate(`/admin/articles/${editing.id}`, { method: "PATCH", body: JSON.stringify(body), successMessage: "مقاله ذخیره شد." })
-      : await mutate("/admin/articles", { method: "POST", body: JSON.stringify(body), successMessage: "مقاله ایجاد شد." });
+      ? await mutate(`/admin/articles/${editing.id}`, { method: "PATCH", body: JSON.stringify(payload), successMessage: "مقاله ذخیره شد." })
+      : await mutate("/admin/articles", { method: "POST", body: JSON.stringify(payload), successMessage: "مقاله ایجاد شد." });
     if (ok) { setCreating(false); setEditing(null); void reload(); }
   };
 
@@ -89,12 +97,14 @@ export default function AdminArticlesPage() {
           rows={filtered}
           empty="مقاله‌ای یافت نشد."
           columns={[
-            { key: "cover", label: "کاور", render: (r: Article) => r.cover_url ? <img src={mediaUrl(r.cover_url)} alt={r.title} className="h-10 w-14 rounded-lg object-cover" /> : <span className="flex h-10 w-14 items-center justify-center rounded-lg bg-slip text-xs text-char-soft">—</span> },
+            { key: "cover", label: "کاور", render: (r: Article) => r.cover_url ? <Image src={mediaUrl(r.cover_url)} alt={r.title} width={56} height={40} unoptimized className="h-10 w-14 rounded-lg object-cover" /> : <span className="flex h-10 w-14 items-center justify-center rounded-lg bg-slip text-xs text-char-soft">—</span> },
             { key: "title", label: "عنوان", render: (r) => <span className="font-medium">{r.title}</span> },
             { key: "category", label: "دسته", render: (r: Article) => <span className="text-xs text-ink-soft">{r.category_name ?? "—"}</span> },
             { key: "slug", label: "شناسه", render: (r) => <span className="text-ink-soft">{r.slug}</span> },
             { key: "published_at", label: "تاریخ انتشار", render: (r) => r.published_at ? <span className="num-latin text-ink-soft">{toPersianDigits(r.published_at.slice(0, 10))}</span> : <span className="text-clay">پیش‌نویس</span> },
             { key: "is_published", label: "وضعیت", render: (r) => <span className={r.is_published ? "text-firouzeh" : "text-clay"}>{r.is_published ? "منتشرشده" : "پیش‌نویس"}</span> },
+            { key: "is_featured", label: "ویژه", render: (r) => r.is_featured ? <span className="text-kiln-clay">★ ویژه</span> : <span className="text-ink-soft">—</span> },
+            { key: "view_count", label: "بازدید", render: (r) => <span className="num-latin text-ink-soft">{toPersianDigits(String(r.view_count ?? 0))}</span> },
           ]}
           actions={(r) => (
             <>
@@ -134,16 +144,23 @@ export default function AdminArticlesPage() {
             <TextArea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} />
           </Field>
           <Field label="متن مقاله" required>
-            <TextArea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={10} className="min-h-48" />
+            <RichTextEditor value={form.body} onChange={(html) => setForm({ ...form, body: html })} placeholder="متن کامل مقاله را اینجا بنویسید…" />
+          </Field>
+          <Field label="تگ‌ها (با کاما جدا کنید)" hint="مثلاً: سرامیک، دست‌ساز، لعاب">
+            <TextInput value={form.tag_slugs} onChange={(e) => setForm({ ...form, tag_slugs: e.target.value })} placeholder="سرامیک، دست‌ساز" dir="rtl" />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="تاریخ انتشار">
               <DateInput value={form.published_at} onChange={(e) => setForm({ ...form, published_at: e.target.value })} />
             </Field>
-            <div className="flex items-end">
+            <div className="flex flex-col gap-2 justify-end">
               <label className="flex items-center gap-3 text-sm">
                 <input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} className="h-4 w-4 rounded" />
                 منتشر شود
+              </label>
+              <label className="flex items-center gap-3 text-sm">
+                <input type="checkbox" checked={form.is_featured} onChange={(e) => setForm({ ...form, is_featured: e.target.checked })} className="h-4 w-4 rounded" />
+                مقاله ویژه (نمایش در بالای صفحه)
               </label>
             </div>
           </div>

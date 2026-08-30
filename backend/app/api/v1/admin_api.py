@@ -13,13 +13,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, text
 from sqlmodel import Session, select
 
-from app.api.v1.auth import admin_user
+from app.api.v1.deps import admin_user
 from app.core.permissions import PERMISSIONS, ROLE_PRESETS, require_permission
 from app.db.session import get_session
 from app.models import (
     ActivityLog,
     Article,
     ArticleCategory,
+    Attribute,
+    AttributeValue,
     Brand,
     Campaign,
     Category,
@@ -30,7 +32,6 @@ from app.models import (
     FAQItem,
     HomepageSection,
     HomepageSectionKind,
-    NewsletterSubscription,
     Notification,
     Order,
     OrderItem,
@@ -38,11 +39,13 @@ from app.models import (
     OrderStatusHistory,
     PaymentTransaction,
     Product,
+    ProductAttribute,
     ProductImage,
     ProductQuestion,
     ProductReview,
     ProductSource,
     ProductVariant,
+    ProductVariantAttributeValue,
     ReturnRequest,
     Setting,
     ShippingMethod,
@@ -232,6 +235,307 @@ def delete_brand(brand_id: str, user: User = Depends(require_permission("categor
     log_activity(session, actor_id=user.id, action="delete", entity_type="brand", entity_id=brand_id)
     session.commit()
     return {"ok": True}
+
+
+# ============================ Attributes (WooCommerce-like) ============================
+
+def _slugify(value: str) -> str:
+    import re
+    s = value.strip().lower()
+    s = re.sub(r"[\s\u200c]+", "-", s)
+    s = re.sub(r"[^\w\-]+", "", s, flags=re.UNICODE)
+    s = re.sub(r"-+", "-", s)
+    return s.strip("-") or "attr"
+
+
+class AttributeIn(BaseModel):
+    name: str = Field(max_length=128)
+    slug: str | None = Field(default=None, max_length=128)
+    sort_order: int = 0
+
+
+class AttributeValueIn(BaseModel):
+    value: str = Field(max_length=128)
+    slug: str | None = Field(default=None, max_length=128)
+    swatch_image_url: str | None = Field(default=None, max_length=512)
+    sort_order: int = 0
+
+
+@admin.get("/attributes")
+def list_attributes(_: None = _require_perm("categories"), session: Session = Depends(get_session)):
+    attrs = session.exec(select(Attribute).order_by(Attribute.sort_order, Attribute.name)).all()
+    out = []
+    for a in attrs:
+        vals = session.exec(select(AttributeValue).where(AttributeValue.attribute_id == a.id).order_by(AttributeValue.sort_order)).all()
+        out.append({
+            "id": a.id, "name": a.name, "slug": a.slug, "sort_order": a.sort_order,
+            "values": [{"id": v.id, "value": v.value, "slug": v.slug, "swatch_image_url": v.swatch_image_url, "sort_order": v.sort_order} for v in vals]
+        })
+    return out
+
+
+@admin.post("/attributes", status_code=201)
+def create_attribute(payload: AttributeIn, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
+    slug = payload.slug or _slugify(payload.name)
+    if session.exec(select(Attribute).where(Attribute.slug == slug)).first():
+        raise HTTPException(409, "slug ویژگی تکراری است.")
+    row = Attribute(name=payload.name, slug=slug, sort_order=payload.sort_order)
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="create", entity_type="attribute", entity_id=row.id, metadata={"name": row.name})
+    session.commit()
+    session.refresh(row)
+    return {"id": row.id, "name": row.name, "slug": row.slug, "sort_order": row.sort_order, "values": []}
+
+
+@admin.patch("/attributes/{attribute_id}")
+def update_attribute(attribute_id: str, payload: dict, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
+    row = session.get(Attribute, attribute_id)
+    if not row:
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    if "slug" in payload and payload["slug"] and payload["slug"] != row.slug:
+        if session.exec(select(Attribute).where(Attribute.slug == payload["slug"], Attribute.id != attribute_id)).first():
+            raise HTTPException(409, "slug تکراری است.")
+    for k in ("name", "slug", "sort_order"):
+        if k in payload:
+            setattr(row, k, payload[k])
+    log_activity(session, actor_id=user.id, action="update", entity_type="attribute", entity_id=row.id)
+    session.add(row)
+    session.commit()
+    return {"id": row.id, "name": row.name, "slug": row.slug, "sort_order": row.sort_order}
+
+
+@admin.delete("/attributes/{attribute_id}")
+def delete_attribute(attribute_id: str, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
+    row = session.get(Attribute, attribute_id)
+    if not row:
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    if session.exec(select(AttributeValue).where(AttributeValue.attribute_id == attribute_id)).first():
+        raise HTTPException(409, "این ویژگی دارای مقدار است؛ ابتدا مقادیر را حذف کنید.")
+    if session.exec(select(ProductAttribute).where(ProductAttribute.attribute_id == attribute_id)).first():
+        raise HTTPException(409, "این ویژگی به محصولی اختصاص داده شده است.")
+    session.delete(row)
+    log_activity(session, actor_id=user.id, action="delete", entity_type="attribute", entity_id=attribute_id)
+    session.commit()
+    return {"ok": True}
+
+
+@admin.post("/attributes/{attribute_id}/values", status_code=201)
+def create_attribute_value(attribute_id: str, payload: AttributeValueIn, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
+    attr = session.get(Attribute, attribute_id)
+    if not attr:
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    slug = payload.slug or _slugify(payload.value)
+    if session.exec(select(AttributeValue).where(AttributeValue.attribute_id == attribute_id, AttributeValue.slug == slug)).first():
+        raise HTTPException(409, "slug مقدار تکراری است.")
+    row = AttributeValue(attribute_id=attribute_id, value=payload.value, slug=slug, swatch_image_url=payload.swatch_image_url, sort_order=payload.sort_order)
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="create", entity_type="attribute_value", entity_id=row.id, metadata={"attribute_id": attribute_id, "value": row.value})
+    session.commit()
+    session.refresh(row)
+    return {"id": row.id, "attribute_id": row.attribute_id, "value": row.value, "slug": row.slug, "swatch_image_url": row.swatch_image_url, "sort_order": row.sort_order}
+
+
+@admin.patch("/attribute-values/{value_id}")
+def update_attribute_value(value_id: str, payload: dict, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
+    row = session.get(AttributeValue, value_id)
+    if not row:
+        raise HTTPException(404, "مقدار یافت نشد.")
+    if "slug" in payload and payload["slug"] and payload["slug"] != row.slug:
+        if session.exec(select(AttributeValue).where(AttributeValue.attribute_id == row.attribute_id, AttributeValue.slug == payload["slug"], AttributeValue.id != value_id)).first():
+            raise HTTPException(409, "slug تکراری است.")
+    for k in ("value", "slug", "swatch_image_url", "sort_order"):
+        if k in payload:
+            setattr(row, k, payload[k])
+    log_activity(session, actor_id=user.id, action="update", entity_type="attribute_value", entity_id=row.id)
+    session.add(row)
+    session.commit()
+    return row
+
+
+@admin.delete("/attribute-values/{value_id}")
+def delete_attribute_value(value_id: str, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
+    row = session.get(AttributeValue, value_id)
+    if not row:
+        raise HTTPException(404, "مقدار یافت نشد.")
+    if session.exec(select(ProductVariantAttributeValue).where(ProductVariantAttributeValue.attribute_value_id == value_id)).first():
+        raise HTTPException(409, "این مقدار در وارینتی استفاده شده است.")
+    if session.exec(select(ProductImage).where(ProductImage.attribute_value_id == value_id)).first():  # type: ignore[attr-defined]
+        raise HTTPException(409, "این مقدار به تصویری تگ شده است.")
+    session.delete(row)
+    session.commit()
+    return {"ok": True}
+
+
+@admin.get("/products/{product_id}/attributes")
+def get_product_attributes(product_id: str, _: None = _require_perm("products"), session: Session = Depends(get_session)):
+    if not session.get(Product, product_id):
+        raise HTTPException(404, "محصول یافت نشد.")
+    links = session.exec(select(ProductAttribute).where(ProductAttribute.product_id == product_id).order_by(ProductAttribute.sort_order)).all()
+    out = []
+    for link in links:
+        attr = session.get(Attribute, link.attribute_id)
+        if not attr:
+            continue
+        vals = session.exec(select(AttributeValue).where(AttributeValue.attribute_id == attr.id).order_by(AttributeValue.sort_order)).all()
+        out.append({
+            "product_attribute_id": link.id,
+            "attribute": {"id": attr.id, "name": attr.name, "slug": attr.slug},
+            "values": [{"id": v.id, "value": v.value, "slug": v.slug, "swatch_image_url": v.swatch_image_url} for v in vals],
+            "sort_order": link.sort_order,
+        })
+    return out
+
+
+@admin.post("/products/{product_id}/attributes", status_code=201)
+def assign_product_attribute(product_id: str, payload: dict, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    attribute_id = payload.get("attribute_id")
+    if not attribute_id:
+        raise HTTPException(400, "attribute_id الزامی است.")
+    if not session.get(Product, product_id):
+        raise HTTPException(404, "محصول یافت نشد.")
+    if not session.get(Attribute, attribute_id):
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    if session.exec(select(ProductAttribute).where(ProductAttribute.product_id == product_id, ProductAttribute.attribute_id == attribute_id)).first():
+        raise HTTPException(409, "این ویژگی قبلاً به محصول اختصاص داده شده است.")
+    row = ProductAttribute(product_id=product_id, attribute_id=attribute_id, sort_order=payload.get("sort_order", 0))
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="assign", entity_type="product_attribute", entity_id=row.id, metadata={"product_id": product_id, "attribute_id": attribute_id})
+    session.commit()
+    session.refresh(row)
+    cache_delete_pattern("products:*")
+    return row
+
+
+@admin.delete("/products/{product_id}/attributes/{attribute_id}")
+def remove_product_attribute(product_id: str, attribute_id: str, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    link = session.exec(select(ProductAttribute).where(ProductAttribute.product_id == product_id, ProductAttribute.attribute_id == attribute_id)).first()
+    if not link:
+        raise HTTPException(404, "ارتباط یافت نشد.")
+    session.delete(link)
+    log_activity(session, actor_id=user.id, action="unassign", entity_type="product_attribute", metadata={"product_id": product_id, "attribute_id": attribute_id})
+    session.commit()
+    cache_delete_pattern("products:*")
+    return {"ok": True}
+
+
+@admin.post("/products/{product_id}/variants/generate", status_code=201)
+def generate_variants(product_id: str, payload: dict, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    """Generate variants via cartesian product of provided value_ids grouped by attribute.
+
+    payload: {"value_ids": ["uuid1", "uuid2", ...]}  # flat list, server groups by attribute
+    Or: {"attribute_value_map": {"attr_id1": ["val_id1","val_id2"], ...}}
+    """
+    product = session.get(Product, product_id)
+    if not product:
+        raise HTTPException(404, "محصول یافت نشد.")
+    # support both formats
+    value_ids: list[str] = payload.get("value_ids") or []
+    attr_map: dict[str, list[str]] | None = payload.get("attribute_value_map")
+    if attr_map:
+        # build value_ids from map
+        value_ids = []
+        for vs in attr_map.values():
+            value_ids.extend(vs)
+    if not value_ids:
+        raise HTTPException(400, "value_ids الزامی است.")
+
+    # load values and group by attribute
+    values = []
+    for vid in value_ids:
+        v = session.get(AttributeValue, vid)
+        if not v:
+            raise HTTPException(404, f"مقدار {vid} یافت نشد.")
+        values.append(v)
+    # group
+    from collections import defaultdict
+    by_attr: dict[str, list] = defaultdict(list)
+    for v in values:
+        by_attr[v.attribute_id].append(v)
+    # ensure product has those attributes assigned (auto-assign if missing)
+    for attr_id in by_attr:
+        if not session.exec(select(ProductAttribute).where(ProductAttribute.product_id == product_id, ProductAttribute.attribute_id == attr_id)).first():
+            session.add(ProductAttribute(product_id=product_id, attribute_id=attr_id))
+
+    # cartesian product
+    import itertools
+    groups = list(by_attr.values())
+    combos = list(itertools.product(*groups)) if groups else []
+    if not combos:
+        raise HTTPException(400, "ترکیبی برای تولید وجود ندارد.")
+
+    created = []
+    for combo in combos:
+        # combo is tuple of AttributeValue
+        # generate variant name like "طرح: خرسی / رنگ: قرمز"
+        # fetch attribute names for ordering by sort_order
+        parts = []
+        slugs = []
+        for av in combo:
+            attr = session.get(Attribute, av.attribute_id)
+            parts.append(f"{attr.name if attr else ''}: {av.value}" if attr else av.value)
+            slugs.append(av.slug)
+        variant_name = " / ".join(parts)
+        # SKU: product sku + "-" + slugs joined
+        sku_suffix = "-".join(slugs)[:32]
+        sku = f"{product.sku}-{sku_suffix}" if product.sku else sku_suffix
+        # check existing via attribute value set
+        # we consider existing if there's a variant with same set of attribute_value_ids
+        existing = None
+        for v in session.exec(select(ProductVariant).where(ProductVariant.product_id == product_id)).all():
+            linked = {r.attribute_value_id for r in session.exec(select(ProductVariantAttributeValue).where(ProductVariantAttributeValue.variant_id == v.id)).all()}
+            if linked == {av.id for av in combo}:
+                existing = v
+                break
+        if existing:
+            continue
+        # ensure SKU unique per product (append random if clash)
+        base_sku = sku
+        counter = 1
+        while session.exec(select(ProductVariant).where(ProductVariant.product_id == product_id, ProductVariant.sku == sku)).first():
+            sku = f"{base_sku}-{counter}"
+            counter += 1
+        variant = ProductVariant(
+            product_id=product_id,
+            name=variant_name,
+            sku=sku,
+            price_delta=0,
+            stock_qty=0,
+            is_active=True,
+        )
+        session.add(variant)
+        session.flush()  # get id
+        for av in combo:
+            session.add(ProductVariantAttributeValue(variant_id=variant.id, attribute_value_id=av.id))
+        created.append(variant)
+
+    session.commit()
+    cache_delete_pattern("products:*")
+    for v in created:
+        session.refresh(v)
+    return {"created": len(created), "variants": [{"id": v.id, "name": v.name, "sku": v.sku} for v in created]}
+
+
+@admin.patch("/products/{product_id}/images/{image_id}")
+def update_product_image(product_id: str, image_id: str, payload: dict, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    img = session.get(ProductImage, image_id)
+    if not img or img.product_id != product_id:
+        raise HTTPException(404, "تصویر یافت نشد.")
+    if "attribute_value_id" in payload:
+        av_id = payload["attribute_value_id"]
+        if av_id is not None:
+            av = session.get(AttributeValue, av_id)
+            if not av:
+                raise HTTPException(404, "مقدار ویژگی یافت نشد.")
+            # optional: ensure product has that attribute
+        img.attribute_value_id = av_id  # type: ignore[attr-defined]
+    if "alt_text" in payload:
+        img.alt_text = payload["alt_text"]
+    if "sort_order" in payload:
+        img.sort_order = int(payload["sort_order"])
+    session.add(img)
+    session.commit()
+    cache_delete_pattern("products:*")
+    return {"id": img.id, "url": img.url, "alt_text": img.alt_text, "sort_order": img.sort_order, "is_primary": img.is_primary, "attribute_value_id": getattr(img, "attribute_value_id", None)}
 
 
 # ============================ Product variants ============================
@@ -788,7 +1092,7 @@ def all_notifications(_: None = _require_perm("settings"), session: Session = De
     return session.exec(select(Notification).order_by(Notification.created_at.desc()).limit(limit)).all()  # type: ignore[arg-type]
 
 
-# ============================ Contact messages & newsletter ============================
+# ============================ Contact messages ============================
 
 @admin.get("/messages")
 def contact_messages(_: None = _require_perm("messages"), session: Session = Depends(get_session)):
@@ -830,21 +1134,6 @@ def delete_message(message_id: str, user: User = Depends(require_permission("mes
     row = session.get(ContactMessage, message_id)
     if not row:
         raise HTTPException(404, "پیام یافت نشد.")
-    session.delete(row)
-    session.commit()
-    return {"ok": True}
-
-
-@admin.get("/newsletter")
-def newsletter_list(_: None = _require_perm("messages"), session: Session = Depends(get_session)):
-    return session.exec(select(NewsletterSubscription).order_by(NewsletterSubscription.created_at.desc())).all()  # type: ignore[arg-type]
-
-
-@admin.delete("/newsletter/{subscription_id}")
-def newsletter_delete(subscription_id: str, user: User = Depends(require_permission("messages")), session: Session = Depends(get_session)):
-    row = session.get(NewsletterSubscription, subscription_id)
-    if not row:
-        raise HTTPException(404, "عضویت یافت نشد.")
     session.delete(row)
     session.commit()
     return {"ok": True}
@@ -980,7 +1269,7 @@ def all_settings(_: None = _require_perm("settings"), session: Session = Depends
 
 @admin.get("/activity")
 def activity_log(
-    _: None = Depends(admin_user),
+    _: None = _require_perm("dashboard"),
     session: Session = Depends(get_session),
     limit: int = Query(100, le=500),
 ):
@@ -1140,7 +1429,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "w
 
 
 @admin.post("/media/upload", status_code=201)
-async def upload_media(file: UploadFile = File(...), user: User = Depends(admin_user), session: Session = Depends(get_session)):
+async def upload_media(file: UploadFile = File(...), user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
     """Upload any admin image (brand logo, category, article cover, carousel, …)
     and return its URL. Product images keep their dedicated endpoint."""
     content_type = file.content_type or ""

@@ -5,6 +5,7 @@ import { FolderTree, Plus } from "lucide-react";
 import { ConfirmDialog, DataTable, EmptyState, ErrorBanner, Modal, PageHeader, TextInput, TextArea, Field, FormActions, Toolbar } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
+import Image from "next/image";
 import { mediaUrl } from "@/lib/api";
 
 interface Category {
@@ -67,7 +68,7 @@ export default function AdminCategoriesPage() {
   const columns = [
     {
       key: "image", label: "تصویر", render: (r: Category) => (
-        r.image_url ? <img src={mediaUrl(r.image_url)} alt={r.name} className="h-10 w-10 rounded-xl object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slip text-xs text-char-soft">—</span>
+        r.image_url ? <Image src={mediaUrl(r.image_url)} alt={r.name} width={40} height={40} unoptimized className="h-10 w-10 rounded-xl object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slip text-xs text-char-soft">—</span>
       ),
     },
     {

@@ -58,10 +58,46 @@ export function authHeaders(json = false): HeadersInit {
   return h;
 }
 
-// --- مدیریت درخواست برای جلوگیری از فشار به بک‌اند ---
+// --- Request deduplication, throttling, and bounded cache ---
 const pendingRequests = new Map<string, Promise<Response>>();
 const lastRequestAt = new Map<string, number>();
+
+// Bounded response cache with TTL and max size
+const CACHE_TTL_MS = 30_000;
+const CACHE_MAX_ENTRIES = 200;
 const responseCache = new Map<string, { res: Response; expiry: number }>();
+
+let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
+
+function evictExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of responseCache) {
+    if (now >= entry.expiry) responseCache.delete(key);
+  }
+  // If still over max, remove oldest entries
+  if (responseCache.size > CACHE_MAX_ENTRIES) {
+    const entries = Array.from(responseCache.entries());
+    // Sort by expiry ascending (oldest first)
+    entries.sort((a, b) => a[1].expiry - b[1].expiry);
+    const toRemove = entries.slice(0, entries.length - CACHE_MAX_ENTRIES);
+    for (const [key] of toRemove) responseCache.delete(key);
+  }
+}
+
+function scheduleCacheCleanup(): void {
+  if (cleanupTimer) return;
+  cleanupTimer = setTimeout(() => {
+    cleanupTimer = null;
+    evictExpiredCache();
+  }, CACHE_TTL_MS);
+}
+
+function setCache(key: string, res: Response): void {
+  // Evict before adding to stay within bounds
+  if (responseCache.size >= CACHE_MAX_ENTRIES) evictExpiredCache();
+  responseCache.set(key, { res: res.clone(), expiry: Date.now() + CACHE_TTL_MS });
+  scheduleCacheCleanup();
+}
 
 function throttleKey(url: string): string {
   try {
@@ -135,11 +171,9 @@ export async function apiFetch(
 
   try {
     const res = await promise;
-    // کش کردن پاسخ موفق GET برای 30 ثانیه
+    // Cache successful GET responses
     if (method === "GET" && res.ok && !init._noCache) {
-      responseCache.set(dedupKey, { res: res.clone(), expiry: Date.now() + 30_000 });
-      // پاکسازی خودکار بعد از 30s
-      setTimeout(() => responseCache.delete(dedupKey), 30_000);
+      setCache(dedupKey, res);
     }
     return res;
   } finally {

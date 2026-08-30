@@ -16,7 +16,9 @@ class HomepageSectionKind(str, enum.Enum):
     categories = "categories"  # category cards grid
     articles = "articles"      # latest article teasers
     faq = "faq"                # FAQ accordion
-    newsletter = "newsletter"  # newsletter signup band
+    brand_story = "brand_story"  # داستان برند / فلسفه دست‌ساز
+    testimonials = "testimonials"  # نظرات مشتریان
+    featured_category_spotlight = "featured_category_spotlight"  # بنر بزرگ برای هر دسته اصلی
 
 
 class ProductSource(str, enum.Enum):
@@ -46,6 +48,7 @@ class HomepageSection(UUIDMixin, TimestampMixin, table=True):
     source: ProductSource | None = Field(default=None, index=True)
     category_id: str | None = Field(default=None, foreign_key="categories.id")
     product_ids: str = "[]"  # JSON list for source=manual
+    image_url: str | None = Field(default=None, max_length=1024)  # brand_story image
 
     def manual_ids(self) -> list[str]:
         try:

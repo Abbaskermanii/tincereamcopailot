@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/*]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ceramics_test
+          POSTGRES_PASSWORD: ceramics_test
+          POSTGRES_DB: ceramics_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ceramics_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://ceramics_test:ceramics_test@localhost:5432/ceramics_test
+      REDIS_URL: redis://localhost:6379/0
+      S3_ENDPOINT: http://localhost:9000
+      RATE_LIMIT_ENABLED: "false"
+      ENVIRONMENT: test
+      SECRET_KEY: ci-test-secret-key-32-chars-minimum-xxxx
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint with ruff
+        run: |
+          ruff check app/ tests/
+
+      - name: Type check with mypy
+        run: |
+          mypy app/ --ignore-missing-imports --no-error-summary || true
+        continue-on-error: true
+
+      - name: Run tests
+        run: |
+          pytest -x -q --tb=short
+
+  frontend:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+          INTERNAL_API_URL: http://localhost:8000/api/v1
+
+  migration-check:
+    name: Migration Validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ceramics_test
+          POSTGRES_PASSWORD: ceramics_test
+          POSTGRES_DB: ceramics_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ceramics_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://ceramics_test:ceramics_test@localhost:5432/ceramics_test
+      ENVIRONMENT: test
+      SECRET_KEY: ci-test-secret-key-32-chars-minimum-xxxx
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run migrations
+        working-directory: backend
+        run: alembic upgrade head

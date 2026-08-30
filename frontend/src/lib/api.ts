@@ -2,10 +2,11 @@ export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, "");
 export function mediaUrl(path: string | null | undefined): string {
   if (!path) return "";
   if (/^https?:\/\//.test(path)) return path;
-  return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
 }
 /** Server-side fetches go through the docker network when available. */
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL;
@@ -29,6 +30,7 @@ export interface ProductImage {
   alt_text: string;
   sort_order: number;
   is_primary: boolean;
+  attribute_value_id?: string | null;
 }
 
 export interface ProductListItem {
@@ -42,6 +44,23 @@ export interface ProductListItem {
   primary_image_url: string | null;
 }
 
+export interface AttributeValue {
+  id: string;
+  attribute_id: string;
+  value: string;
+  slug: string;
+  swatch_image_url?: string | null;
+  sort_order?: number;
+}
+
+export interface Attribute {
+  id: string;
+  name: string;
+  slug: string;
+  sort_order?: number;
+  values: AttributeValue[];
+}
+
 export interface ProductVariant {
   id: string;
   name: string;
@@ -51,6 +70,8 @@ export interface ProductVariant {
   stock_qty: number;
   is_active: boolean;
   image_url?: string;
+  attribute_value_ids?: string[];
+  attribute_values?: Array<{ id: string; attribute_id: string; value: string; slug: string; swatch_image_url?: string | null }>;
 }
 
 export interface ShippingMethod {
@@ -131,10 +152,40 @@ export const api = {
         discount_percent: number;
         images: ProductImage[];
         variants: ProductVariant[];
+        attributes: Attribute[];
       }
     >(`/products/${slug}`),
-  articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string }>>("/articles", 180),
-  article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string }>(`/articles/${slug}`, 300),
+  articles: (params?: Record<string, string | number | boolean | undefined>) => {
+    const qs = new URLSearchParams();
+    if (params) for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    const path = qs.toString() ? `/articles?${qs}` : "/articles";
+    return get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string; updated_at?: string; cover_url?: string | null; cover_image_url?: string | null; category_id?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; view_count?: number; reading_time_minutes?: number; is_featured?: boolean; meta_title?: string | null; meta_description?: string | null; tags?: Array<{ id: string; name: string; slug: string }> }>>(path, 180);
+  },
+  article: (slug: string) =>
+    get<{
+      id: string;
+      title: string;
+      slug: string;
+      excerpt?: string;
+      body: string;
+      published_at?: string;
+      updated_at?: string;
+      cover_url?: string | null;
+      cover_image_url?: string | null;
+      category_id?: string | null;
+      category_name?: string | null;
+      author_name?: string | null;
+      author_avatar_url?: string | null;
+      view_count?: number;
+      reading_time_minutes?: number;
+      is_featured?: boolean;
+      meta_title?: string | null;
+      meta_description?: string | null;
+      tags?: Array<{ id: string; name: string; slug: string }>;
+      related?: Array<{ id: string; title: string; slug: string; excerpt?: string; cover_url?: string | null; published_at?: string }>;
+    }>(`/articles/${slug}`, 30),
+  articleCategories: () => get<Array<{ id: string; name: string; slug: string }>>("/article-categories", 300),
+  articleTags: () => get<Array<{ id: string; name: string; slug: string }>>("/article-tags", 300),
   carousels: () =>
     get<Array<{ id: string; title?: string; subtitle?: string | null; image_url: string; link_url?: string | null; sort_order: number; is_active?: boolean }>>(
       "/carousels",

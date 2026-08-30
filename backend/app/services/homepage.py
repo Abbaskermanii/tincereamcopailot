@@ -18,6 +18,7 @@ from app.models import (
     HomepageSection,
     HomepageSectionKind,
     Product,
+    ProductReview,
     ProductSource,
 )
 from app.services.cache import cache_delete_pattern, cache_get_json, cache_set_json
@@ -195,6 +196,46 @@ def _section_payload(session: Session, s: HomepageSection) -> dict:
         payload["faq"] = [
             {"id": f.id, "question": f.question, "answer": f.answer} for f in rows
         ]
+    elif s.kind == HomepageSectionKind.brand_story:
+        # admin can customize title/subtitle/image via homepage section settings
+        payload["story"] = {
+            "title": s.title or "داستان تن‌سِرام",
+            "subtitle": s.subtitle or "سفال، با دستِ ایرانی گرم می‌شود",
+            "body": "هر قطعه در کارگاه تن‌سِرام از خاک رس سفید و لعاب لاجوردی با دست چرخ‌کاری می‌شود؛ از کوره تا میز شما، با عشق و دقت.",
+            "image_url": getattr(s, "image_url", None),
+        }
+    elif s.kind == HomepageSectionKind.testimonials:
+        # top approved reviews
+        rows = session.exec(
+            select(ProductReview).where(ProductReview.is_approved == True).order_by(ProductReview.created_at.desc()).limit(s.limit_count)  # type: ignore[arg-type]
+        ).all()
+        payload["testimonials"] = [
+            {"id": r.id, "author_name": r.author_name, "rating": r.rating, "title": r.title, "body": r.body, "product_id": r.product_id}
+            for r in rows
+        ]
+    elif s.kind == HomepageSectionKind.featured_category_spotlight:
+        cats = session.exec(
+            select(Category).where(Category.parent_id == None).order_by(Category.name)  # noqa: E711
+        ).all()
+        counts = {
+            r[0]: int(r[1])
+            for r in session.exec(
+                select(Product.category_id, func.count(Product.id))
+                .where(Product.is_active == True)  # noqa: E712
+                .group_by(Product.category_id)
+            ).all()
+        }
+        payload["categories"] = [
+            {
+                "id": c.id,
+                "name": c.name,
+                "slug": c.slug,
+                "image_url": c.image_url,
+                "product_count": counts.get(c.id, 0),
+            }
+            for c in cats
+        ][: s.limit_count]
+        payload["spotlight"] = True
     return payload
 
 
@@ -216,14 +257,19 @@ def homepage_payload(session: Session) -> dict:
 
 
 def default_sections() -> list[HomepageSection]:
-    """Sensible starter layout, used by the seed script and first boot."""
+    """Sensible starter layout, used by the seed script and first boot.
+
+    Order per design spec: Hero → دسته‌بندی ویژه/spotlight → پرفروش/جدید → داستان برند → مقالات → نظرات → FAQ
+    Still admin-reorderable.
+    """
     return [
         HomepageSection(kind=HomepageSectionKind.hero, title="بنر اصلی", sort_order=0, limit_count=6),
-        HomepageSection(kind=HomepageSectionKind.products, title="پرفروش‌ترین‌ها", source=ProductSource.best_sellers, sort_order=10, limit_count=8),
-        HomepageSection(kind=HomepageSectionKind.categories, title="دسته‌بندی‌ها", sort_order=20, limit_count=8),
+        HomepageSection(kind=HomepageSectionKind.featured_category_spotlight, title="دسته‌بندی‌های ویژه", sort_order=10, limit_count=6),
+        HomepageSection(kind=HomepageSectionKind.products, title="پرفروش‌ترین‌ها", source=ProductSource.best_sellers, sort_order=20, limit_count=8),
         HomepageSection(kind=HomepageSectionKind.products, title="تازه‌رسیده‌ها", source=ProductSource.new_arrivals, sort_order=30, limit_count=8),
         HomepageSection(kind=HomepageSectionKind.products, title="پیشنهاد ویژه", source=ProductSource.discounted, sort_order=40, limit_count=8),
-        HomepageSection(kind=HomepageSectionKind.articles, title="از مجله تن‌سِرام", sort_order=50, limit_count=4),
-        HomepageSection(kind=HomepageSectionKind.faq, title="سوالات رایج", sort_order=60, limit_count=5),
-        HomepageSection(kind=HomepageSectionKind.newsletter, title="خبرنامه", sort_order=70),
+        HomepageSection(kind=HomepageSectionKind.brand_story, title="داستان تن‌سِرام", subtitle="سفال، با دستِ ایرانی گرم می‌شود", sort_order=50, limit_count=1),
+        HomepageSection(kind=HomepageSectionKind.articles, title="از مجله تن‌سِرام", sort_order=60, limit_count=4),
+        HomepageSection(kind=HomepageSectionKind.testimonials, title="آنچه مشتریان می‌گویند", sort_order=70, limit_count=6),
+        HomepageSection(kind=HomepageSectionKind.faq, title="سوالات رایج", sort_order=80, limit_count=5),
     ]

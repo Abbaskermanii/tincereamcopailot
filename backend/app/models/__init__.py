@@ -33,10 +33,11 @@ from app.models.identity import (
     WishlistItem,
 )
 from app.models.operations import (
-    ActivityLog, Article, ArticleCategory, Carousel, NewsletterSubscription,
+    ActivityLog, Article, ArticleCategory, ArticleTag, ArticleTagLink, Carousel,
     Notification, RelatedProduct, Setting,
 )
 from app.models.variant import ProductVariant
+from app.models.attribute import Attribute, AttributeValue, ProductAttribute, ProductVariantAttributeValue
 
 __all__ = [
     "Brand",
@@ -49,8 +50,9 @@ __all__ = [
     "HomepageSection", "HomepageSectionKind", "ProductSource",
     "Order", "OrderItem", "OrderStatus",
     "Product", "ProductImage", "ProductVariant",
+    "Attribute", "AttributeValue", "ProductAttribute", "ProductVariantAttributeValue",
     "Address", "OtpCode", "OtpPurpose", "PasswordResetToken",
     "RefreshToken", "Role", "User", "WishlistItem",
-    "ActivityLog", "Article", "ArticleCategory", "Carousel",
-    "NewsletterSubscription", "Notification", "RelatedProduct", "Setting",
+    "ActivityLog", "Article", "ArticleCategory", "ArticleTag", "ArticleTagLink", "Carousel",
+    "Notification", "RelatedProduct", "Setting",
 ]

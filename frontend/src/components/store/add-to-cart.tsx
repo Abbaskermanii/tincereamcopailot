@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { Heart, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
@@ -43,6 +43,7 @@ export function AddToCartPanel({
     stock_qty: number;
   }) => void;
 }) {
+  const prefersReduced = useReducedMotion();
   const [qty, setQty] = useState(1);
   const [burst, setBurst] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(() =>
@@ -176,7 +177,7 @@ export function AddToCartPanel({
           aria-hidden
           initial={{ scale: 0, opacity: 0.9 }}
           animate={burst ? { scale: 2.2, opacity: 0 } : { scale: 0 }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
+          transition={{ duration: prefersReduced ? 0 : 0.6, ease: "easeOut" }}
           className="pointer-events-none absolute inset-0 rounded-wobble border-2 border-firouzeh"
         />
         <Button

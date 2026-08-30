@@ -18,5 +18,6 @@ class ProductImage(UUIDMixin, table=True):
     alt_text: str = Field(default="", max_length=512)
     sort_order: int = Field(default=0)
     is_primary: bool = Field(default=False)
+    attribute_value_id: str | None = Field(default=None, foreign_key="attribute_values.id", index=True)
 
     product: "Product" = Relationship(back_populates="images")

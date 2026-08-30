@@ -5,7 +5,7 @@ from app.core.config import get_settings
 from app.db.session import get_session
 from app.api.v1.auth import optional_user
 from app.models import Coupon, Order, OrderStatus, PaymentTransaction
-from app.schemas.store import OrderCreate, OrderCreatedOut, OrderItemOut, OrderStatusOut
+from app.schemas.store import OrderCreate, OrderCreatedOut, OrderItemOut, OrderStatusEventOut, OrderStatusOut
 from app.services.orders import OrderError, create_order
 from app.services.cache import cache_delete_pattern
 from app.services.notifier import RTL_EMAIL_SHELL, send_email
@@ -117,8 +117,13 @@ async def order_status(
     ).first()
     if not order:
         raise HTTPException(404, "سفارش یافت نشد.")
-    from app.models import OrderItem
+    from app.models import OrderItem, OrderStatusHistory
     items = session.exec(select(OrderItem).where(OrderItem.order_id == order.id)).all()
+    history_rows = session.exec(
+        select(OrderStatusHistory)
+        .where(OrderStatusHistory.order_id == order.id)  # type: ignore[arg-type]
+        .order_by(OrderStatusHistory.created_at)  # type: ignore[arg-type]
+    ).all()
     return OrderStatusOut(
         order_number=order.order_number,
         status=order.status,
@@ -143,6 +148,9 @@ async def order_status(
                 variant_name_snapshot=i.variant_name_snapshot,
             )
             for i in items
+        ],
+        history=[
+            OrderStatusEventOut(status=h.to_status, at=h.created_at) for h in history_rows
         ],
     )
 

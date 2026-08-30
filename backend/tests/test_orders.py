@@ -177,3 +177,41 @@ class TestOrderStatus:
     async def test_status_unknown_order_404(self, client):
         resp = await client.get("/api/v1/orders/TC-000000-NOPE00/status")
         assert resp.status_code == 404
+
+    async def test_status_history_field(self, client, sample_product):
+        """/orders/{num}/status exposes a backward-compatible `history` timeline."""
+        created = (await client.post("/api/v1/orders", json=_payload(sample_product))).json()
+        order_number = created["order_number"]
+
+        # fresh order: single pending event
+        resp = await client.get(f"/api/v1/orders/{order_number}/status")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["order_number"] == order_number
+        assert body["status"] == "pending"
+        history = body["history"]
+        assert isinstance(history, list) and len(history) == 1
+        assert history[0]["status"] == "pending"
+        assert history[0]["at"]
+
+        # progress the order the way the admin status endpoint does
+        from sqlmodel import Session, select
+
+        from app.db.session import engine as app_engine
+        from app.models import Order, OrderStatus, OrderStatusHistory
+
+        with Session(app_engine) as s:
+            order = s.exec(select(Order).where(Order.order_number == order_number)).one()
+            order.status = OrderStatus.shipped
+            order.tracking_code = "TC12345678"
+            order.carrier = "پست پیشتاز"
+            s.add(order)
+            s.add(OrderStatusHistory(order_id=order.id, from_status="paid", to_status="shipped"))
+            s.commit()
+
+        resp = await client.get(f"/api/v1/orders/{order_number}/status")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert [h["status"] for h in body["history"]] == ["pending", "shipped"]
+        assert body["tracking_code"] == "TC12345678"
+        assert body["carrier"] == "پست پیشتاز"

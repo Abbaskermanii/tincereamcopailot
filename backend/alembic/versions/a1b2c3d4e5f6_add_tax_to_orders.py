@@ -1,7 +1,7 @@
 """add tax to orders
 
 Revision ID: a1b2c3d4e5f6
-Revises: f3e4a9b8c7d6
+Revises: 19ec71079e51
 Create Date: 2026-08-29
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, None] = 'f3e4a9b8c7d6'
+down_revision: Union[str, None] = '19ec71079e51'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

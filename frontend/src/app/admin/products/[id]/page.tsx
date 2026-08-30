@@ -8,13 +8,14 @@ import {
   AdminCard, ConfirmDialog, Field, FormActions, Modal, PageHeader, SelectInput, TextArea, TextInput, Toggle,
 } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { useAdminMutation, useAdminResource, useDebounced } from "@/lib/admin-hooks";
 import { useToast } from "@/components/ui/toast-provider";
 import { mediaUrl } from "@/lib/api";
 import { faNum, faPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-interface ImageRow { id: string; url: string; alt_text: string; is_primary: boolean; }
+interface ImageRow { id: string; url: string; alt_text: string; is_primary: boolean; attribute_value_id?: string | null; }
 interface VariantRow {
   id: string; name: string; sku: string; image_url: string | null;
   price_delta: number; absolute_price: number | null; stock_qty: number; is_active: boolean;
@@ -38,6 +39,7 @@ const TABS = [
   { key: "pricing", label: "قیمت" },
   { key: "inventory", label: "انبار" },
   { key: "media", label: "تصاویر" },
+  { key: "attributes", label: "ویژگی‌ها" },
   { key: "variants", label: "وارینت‌ها" },
   { key: "related", label: "محصولات مرتبط" },
   { key: "seo", label: "سئو" },
@@ -169,7 +171,7 @@ export default function AdminProductEditorPage() {
             </div>
             <div className="sm:col-span-2">
               <Field label="توضیحات کامل">
-                <TextArea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={6} />
+                <RichTextEditor value={form.description} onChange={(html) => setForm({ ...form, description: html })} placeholder="توضیحات کامل محصول…" />
               </Field>
             </div>
             <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} label="محصول فعال باشد (در فروشگاه دیده شود)" />
@@ -222,6 +224,7 @@ export default function AdminProductEditorPage() {
       )}
 
       {tab === "media" && effectiveProductId && <ProductMedia productId={effectiveProductId} />}
+      {tab === "attributes" && effectiveProductId && <ProductAttributes productId={effectiveProductId} />}
       {tab === "variants" && effectiveProductId && <ProductVariants productId={effectiveProductId} />}
       {tab === "related" && effectiveProductId && <RelatedProducts productId={effectiveProductId} />}
 
@@ -260,9 +263,16 @@ function EffectivePricePreview({ price, compare }: { price: string; compare: str
 
 function ProductMedia({ productId }: { productId: string }) {
   const { data: images, reload } = useAdminResource<ImageRow[]>(`/admin/products/${productId}/images`);
+  const { data: attrs } = useAdminResource<Array<{ attribute: { id: string; name: string }; values: Array<{ id: string; value: string }> }>>(`/admin/products/${productId}/attributes`);
+  const { data: globalAttrs } = useAdminResource<Array<{ id: string; name: string; values: Array<{ id: string; value: string }> }>>("/admin/attributes");
   const { mutate, busy } = useAdminMutation();
   const [uploadUrl, setUploadUrl] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const allValues = (globalAttrs ?? []).flatMap((a) => a.values.map((v) => ({ ...v, attrName: a.name })));
+  const productValueIds = new Set((attrs ?? []).flatMap((pa) => pa.values.map((v) => v.id)));
+  // for tagging, show only values of product's assigned attributes if any, else all global
+  const tagOptions = productValueIds.size > 0 ? allValues.filter((v) => productValueIds.has(v.id)) : allValues;
 
   const addImage = async () => {
     if (!uploadUrl) { toast("ابتدا تصویر را انتخاب کنید.", "error"); return; }
@@ -304,17 +314,121 @@ function ProductMedia({ productId }: { productId: string }) {
                   <Image src={mediaUrl(img.url)} alt={img.alt_text || "تصویر محصول"} fill sizes="200px" className="object-cover" />
                   {img.is_primary && <span className="absolute right-2 top-2 rounded-full bg-firouzeh px-2 py-0.5 text-xs text-white">شاخص</span>}
                 </div>
-                <div className="flex gap-1 p-2">
-                  {!img.is_primary && (
-                    <button type="button" onClick={() => void setPrimary(img.id)} disabled={busy} className="min-h-[36px] flex-1 rounded-lg border border-char/20 text-xs dark:border-white/20">شاخص کن</button>
-                  )}
-                  <button type="button" onClick={() => void removeImage(img.id)} disabled={busy} className="min-h-[36px] flex-1 rounded-lg text-xs text-clay hover:bg-clay/10">حذف</button>
+                <div className="space-y-1 p-2">
+                  <select
+                    value={img.attribute_value_id ?? ""}
+                    onChange={async (e) => {
+                      const av = e.target.value || null;
+                      const ok = await mutate(`/admin/products/${productId}/images/${img.id}`, { method: "PATCH", body: JSON.stringify({ attribute_value_id: av }) });
+                      if (ok) void reload();
+                    }}
+                    className="w-full rounded-lg border border-char/15 bg-white px-2 py-1 text-xs dark:border-white/15 dark:bg-black/20"
+                  >
+                    <option value="">— بدون تگ —</option>
+                    {tagOptions.map((v) => (
+                      <option key={v.id} value={v.id}>{v.attrName}: {v.value}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-1">
+                    {!img.is_primary && (
+                      <button type="button" onClick={() => void setPrimary(img.id)} disabled={busy} className="min-h-[36px] flex-1 rounded-lg border border-char/20 text-xs dark:border-white/20">شاخص کن</button>
+                    )}
+                    <button type="button" onClick={() => void removeImage(img.id)} disabled={busy} className="min-h-[36px] flex-1 rounded-lg text-xs text-clay hover:bg-clay/10">حذف</button>
+                  </div>
                 </div>
               </li>
             ))}
           </ul>
         )}
       </AdminCard>
+    </div>
+  );
+}
+
+/* ————— Attributes tab ————— */
+
+function ProductAttributes({ productId }: { productId: string }) {
+  const { data: attrs, reload } = useAdminResource<Array<{ product_attribute_id: string; attribute: { id: string; name: string; slug: string }; values: Array<{ id: string; value: string; slug: string; swatch_image_url: string | null }> }>>(`/admin/products/${productId}/attributes`);
+  const { data: globalAttrs } = useAdminResource<Array<{ id: string; name: string; slug: string; values: Array<{ id: string; value: string; slug: string; swatch_image_url: string | null }> }>>("/admin/attributes");
+  const { mutate, busy } = useAdminMutation();
+  const { toast } = useToast();
+  const [selectedAttrId, setSelectedAttrId] = useState("");
+  const [selectedValueIds, setSelectedValueIds] = useState<Record<string, boolean>>({});
+
+  const assignedIds = new Set((attrs ?? []).map((pa) => pa.attribute.id));
+  const unassigned = (globalAttrs ?? []).filter((a) => !assignedIds.has(a.id));
+
+  const assign = async () => {
+    if (!selectedAttrId) { toast("ویژگی را انتخاب کنید.", "error"); return; }
+    const ok = await mutate(`/admin/products/${productId}/attributes`, { method: "POST", body: JSON.stringify({ attribute_id: selectedAttrId }), successMessage: "ویژگی به محصول افزوده شد." });
+    if (ok) { setSelectedAttrId(""); void reload(); }
+  };
+  const unassign = async (attrId: string) => {
+    const ok = await mutate(`/admin/products/${productId}/attributes/${attrId}`, { method: "DELETE", successMessage: "ویژگی حذف شد." });
+    if (ok) void reload();
+  };
+  const generate = async () => {
+    const ids = Object.entries(selectedValueIds).filter(([, v]) => v).map(([k]) => k);
+    if (ids.length === 0) { toast("حداقل یک مقدار را انتخاب کنید.", "error"); return; }
+    const ok = await mutate(`/admin/products/${productId}/variants/generate`, { method: "POST", body: JSON.stringify({ value_ids: ids }), successMessage: "وارینت‌ها تولید شدند." });
+    if (ok) {
+      setSelectedValueIds({});
+      void reload();
+      // also trigger variants tab reload? variant list will refresh on next tab switch, but we toast
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <AdminCard title="ویژگی‌های این محصول">
+        {(attrs ?? []).length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-soft">هنوز ویژگی‌ای به این محصول اختصاص داده نشده است.</p>
+        ) : (
+          <ul className="space-y-3">
+            {(attrs ?? []).map((pa) => (
+              <li key={pa.attribute.id} className="rounded-xl border border-char/10 p-3 dark:border-white/10">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold">{pa.attribute.name} <span className="text-xs text-ink-soft">/{pa.attribute.slug}</span></p>
+                  <button type="button" onClick={() => void unassign(pa.attribute.id)} className="text-xs text-clay hover:underline">حذف ویژگی از محصول</button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {pa.values.map((v) => {
+                    const checked = Boolean(selectedValueIds[v.id]);
+                    return (
+                      <label key={v.id} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm cursor-pointer", checked ? "border-lajvard bg-lajvard/10 text-lajvard dark:border-lajvard-soft" : "border-char/15 dark:border-white/15")}>
+                        <input type="checkbox" checked={checked} onChange={(e) => setSelectedValueIds((prev) => ({ ...prev, [v.id]: e.target.checked }))} className="h-4 w-4" />
+                        {v.value}
+                        {v.swatch_image_url && <span className="h-5 w-5 overflow-hidden rounded-full border"><Image src={mediaUrl(v.swatch_image_url)} alt={v.value} width={20} height={20} unoptimized className="h-full w-full object-cover" /></span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </AdminCard>
+
+      <AdminCard title="افزودن ویژگی به محصول">
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="ویژگی سراسری">
+            <SelectInput value={selectedAttrId} onChange={(e) => setSelectedAttrId(e.target.value)}>
+              <option value="">— انتخاب ویژگی —</option>
+              {unassigned.map((a) => <option key={a.id} value={a.id}>{a.name} — {a.values.length} مقدار</option>)}
+            </SelectInput>
+          </Field>
+          <button type="button" onClick={() => void assign()} disabled={busy || !selectedAttrId} className="min-h-[44px] rounded-xl bg-lajvard px-4 text-sm text-white disabled:opacity-50 dark:bg-lajvard-soft dark:text-char">افزودن</button>
+          <a href="/admin/attributes" className="text-xs text-lajvard underline dark:text-lajvard-soft">مدیریت ویژگی‌های سراسری →</a>
+        </div>
+        {unassigned.length === 0 && <p className="mt-2 text-xs text-ink-soft">همه ویژگی‌های سراسری به این محصول اختصاص یافته‌اند. برای ساخت ویژگی جدید به صفحه مدیریت ویژگی‌ها بروید.</p>}
+      </AdminCard>
+
+      {(attrs ?? []).length > 0 && (
+        <AdminCard title="تولید وارینت از مقادیر انتخاب‌شده">
+          <p className="text-sm text-ink-soft">مقادیر مورد نظر را در بخش بالا تیک بزنید (مثلاً: خرسی، ساده) سپس تولید را بزنید. سیستم ترکیب‌های ممکن را به‌صورت خودکار به‌عنوان وارینت می‌سازد (اگر یک ویژگی باشد، هر مقدار = یک وارینت؛ اگر دو ویژگی باشد، ضرب دکارتی).</p>
+          <button type="button" onClick={() => void generate()} disabled={busy} className="mt-3 min-h-[44px] rounded-xl bg-firouzeh px-6 text-sm font-bold text-white hover:bg-firouzeh/90 dark:bg-firouzeh-soft dark:text-char">تولید وارینت‌ها</button>
+        </AdminCard>
+      )}
     </div>
   );
 }

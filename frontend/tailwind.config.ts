@@ -8,7 +8,8 @@ const config: Config = {
       colors: {
         lajvard: { DEFAULT: "#31547A", deep: "#26415F", soft: "#8FB2D9" },
         firouzeh: { DEFAULT: "#7A9E93", soft: "#93B8AC" },
-        clay: { DEFAULT: "#B0764F", soft: "#CF9270" },
+        // clay-deep: darkened kiln-clay — light-mode-only text tone that clears WCAG-AA (4.8:1) on slip
+        clay: { DEFAULT: "#B0764F", soft: "#CF9270", deep: "#8A5A3C" },
         slip: { DEFAULT: "#EDEAE3", raised: "#F6F4EF" },
         char: { DEFAULT: "#26221F", soft: "#57514B" },
         copper: "#9C6B5E",

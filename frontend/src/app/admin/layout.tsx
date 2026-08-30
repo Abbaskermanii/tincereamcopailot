@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  BarChart3, Boxes, ChevronDown, FolderTree, Home, Image as ImageIcon,
+  Activity, BarChart3, Boxes, ChevronDown, FolderTree, Home, Image as ImageIcon,
   LayoutDashboard, LogOut, Megaphone, Menu, MessageSquare,
   Package, ReceiptText, RotateCcw, ScrollText, Settings, ShieldCheck,
-  ShoppingBag, Star, Tags, Ticket, Truck, Users, X, HelpCircle,
+  Star, Tags, Ticket, Truck, Users, X, HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,7 @@ const NAV: NavGroup[] = [
       { label: "محصولات", href: "/admin/products", icon: Package },
       { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: FolderTree },
       { label: "برندها", href: "/admin/brands", icon: Tags },
+      { label: "ویژگی‌ها", href: "/admin/attributes", icon: Tags },
       { label: "هشدار موجودی", href: "/admin/stock-alerts", icon: Boxes },
     ],
   },
@@ -60,7 +61,6 @@ const NAV: NavGroup[] = [
       { label: "نظرات", href: "/admin/reviews", icon: Star },
       { label: "پرسش‌ها", href: "/admin/questions", icon: MessageSquare },
       { label: "پیام‌ها", href: "/admin/messages", icon: MessageSquare },
-      { label: "خبرنامه", href: "/admin/newsletter", icon: Megaphone },
     ],
   },
   {
@@ -68,7 +68,7 @@ const NAV: NavGroup[] = [
     items: [
       { label: "تنظیمات", href: "/admin/settings", icon: Settings },
       { label: "اعلان‌ها", href: "/admin/notifications", icon: Megaphone },
-      { label: "فعالیت‌ها", href: "/admin/activity", icon: ShoppingBag },
+      { label: "فعالیت‌ها", href: "/admin/activity", icon: Activity },
       { label: "نقش‌ها و دسترسی‌ها", href: "/admin/roles", icon: ShieldCheck },
     ],
   },

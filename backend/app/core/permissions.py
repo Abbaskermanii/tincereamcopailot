@@ -3,9 +3,10 @@
 from fastapi import Depends, HTTPException
 from sqlmodel import Session
 
-from app.api.v1.auth import admin_user, current_user
+from app.api.v1.deps import admin_user
 from app.db.session import get_session
 from app.models import Role, User
+
 
 # ---- Permission catalog (admin UI groups by these) ----
 PERMISSIONS: dict[str, str] = {
