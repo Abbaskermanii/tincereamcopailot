@@ -34,10 +34,10 @@ export default function CartPage() {
       <div className="space-y-4">
         {lines.map((l) => (
           <article
-            key={l.productId}
-            className="flex items-center gap-4 rounded-wobble bg-surface p-4 shadow-shelf dark:bg-black/25"
+            key={`${l.productId}-${l.variantId ?? ""}`}
+            className="flex items-center gap-4 rounded-wobble bg-surface p-4 shadow-shelf"
           >
-            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-slip dark:bg-black/30">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-slip dark:bg-surface">
               {l.imageUrl && (
                 <Image src={mediaUrl(l.imageUrl)} alt={l.name} fill sizes="96px" className="object-cover" />
               )}
@@ -50,7 +50,7 @@ export default function CartPage() {
               <div className="mt-3">
                 <QuantityStepper
                   value={l.quantity}
-                  onChange={(q) => setQuantity(l.productId, q)}
+                  onChange={(q) => setQuantity(l.productId, q, l.variantId ?? null)}
                   max={Math.max(l.stockQty, 1)}
                 />
               </div>
@@ -58,10 +58,10 @@ export default function CartPage() {
             <div className="flex shrink-0 flex-col items-end gap-3">
               <button
                 aria-label={`حذف ${l.name}`}
-                onClick={() => remove(l.productId)}
-                className="rounded-xl p-2 text-char-soft hover:bg-clay/10 hover:text-clay"
+                onClick={() => remove(l.productId, l.variantId ?? null)}
+                className="inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-char-soft hover:bg-clay/10 hover:text-clay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clay"
               >
-                <Trash2 size={18} />
+                <Trash2 size={18} aria-hidden="true" />
               </button>
               <p className="font-bold text-lajvard dark:text-lajvard-soft">
                 {faNum(l.price * l.quantity)}
@@ -71,7 +71,7 @@ export default function CartPage() {
         ))}
       </div>
 
-      <footer className="mt-10 flex flex-col gap-6 rounded-wobble bg-surface p-6 shadow-shelf sm:flex-row sm:items-center sm:justify-between dark:bg-black/25">
+      <footer className="mt-10 flex flex-col gap-6 rounded-wobble bg-surface p-6 shadow-shelf sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-char-soft dark:text-ink-soft">جمع کل (بدون ارسال)</p>
           <p className="mt-1 text-2xl font-extrabold text-lajvard dark:text-lajvard-soft">

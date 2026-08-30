@@ -24,9 +24,9 @@ export async function RelatedProducts({
           <Link
             key={p.id}
             href={`/product/${p.slug}`}
-            className="glaze-edge group overflow-hidden rounded-wobble bg-surface p-3 shadow-shelf transition-shadow hover:shadow-lifted dark:bg-black/25"
+            className="glaze-edge group overflow-hidden rounded-wobble bg-surface p-3 shadow-shelf transition-shadow hover:shadow-lifted"
           >
-            <div className="relative aspect-square overflow-hidden rounded-2xl bg-slip dark:bg-black/30">
+            <div className="relative aspect-square overflow-hidden rounded-2xl bg-slip dark:bg-surface">
               {p.primary_image_url && (
                 <Image
                   src={p.primary_image_url}

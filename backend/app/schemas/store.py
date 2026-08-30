@@ -47,6 +47,19 @@ class ProductListItem(BaseModel):
     primary_image_url: str | None = None
 
 
+class ProductVariantOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    sku: str
+    image_url: str | None = None
+    price_delta: float
+    absolute_price: float | None
+    stock_qty: int
+    is_active: bool
+
+
 class ProductDetail(ProductListItem):
     description: str
     sku: str
@@ -60,6 +73,7 @@ class ProductDetail(ProductListItem):
     category_slug: str | None = None
     discount_percent: int = 0
     images: list[ProductImageOut]
+    variants: list[ProductVariantOut] = []
 
 
 class ProductPage(BaseModel):
@@ -74,6 +88,7 @@ class ProductPage(BaseModel):
 class OrderItemIn(BaseModel):
     product_id: str
     quantity: int = Field(gt=0, le=99)
+    variant_id: str | None = None
 
 
 class OrderCreate(BaseModel):
@@ -88,6 +103,9 @@ class OrderCreate(BaseModel):
     coupon_code: str | None = None
     gift_wrap: bool = False
     gift_note: str | None = Field(default=None, max_length=512)
+    shipping_method_id: str | None = None
+    # legacy: product_id -> variant_id for variant purchases (kept for backward compat)
+    variant_selections: dict[str, str] | None = None
 
 
 class OrderItemOut(BaseModel):
@@ -98,6 +116,8 @@ class OrderItemOut(BaseModel):
     unit_price_snapshot: float
     quantity: int
     subtotal: float
+    variant_id: str | None = None
+    variant_name_snapshot: str | None = None
 
 
 class OrderOut(BaseModel):
@@ -108,6 +128,9 @@ class OrderOut(BaseModel):
     total_amount: float
     shipping_cost: float
     discount_amount: float
+    tax_rate: float = 0
+    tax_amount: float = 0
+    campaign_discount_amount: float = 0
     items: list[OrderItemOut]
 
 
@@ -119,6 +142,16 @@ class OrderStatusOut(BaseModel):
     order_number: str
     status: OrderStatus
     updated_at: datetime
+    total_amount: float = 0
+    shipping_cost: float = 0
+    discount_amount: float = 0
+    tax_rate: float = 0
+    tax_amount: float = 0
+    campaign_discount_amount: float = 0
+    tracking_code: str | None = None
+    carrier: str | None = None
+    shipping_method_name: str | None = None
+    items: list[OrderItemOut] = []
 
 
 # ---------- Coupons ----------

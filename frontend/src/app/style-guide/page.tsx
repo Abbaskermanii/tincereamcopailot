@@ -37,7 +37,7 @@ export default function StyleGuidePage() {
         <SectionHeading title="پالت رنگ" subtitle="برگرفته از لعاب و خاک کوره" />
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
           {PALETTE.map((c) => (
-            <div key={c.hex} className="glaze-edge rounded-wobble bg-surface p-3 shadow-shelf dark:bg-black/25">
+            <div key={c.hex} className="glaze-edge rounded-wobble bg-surface p-3 shadow-shelf">
               <div className="h-20 rounded-2xl" style={{ backgroundColor: c.hex }} />
               <p className="pt-3 font-bold">{c.name}</p>
               <p className="num-latin text-xs text-char-soft" dir="ltr">{c.hex}</p>

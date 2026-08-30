@@ -33,16 +33,16 @@ class TestHealth:
 
 class TestAdminPanel:
     async def test_login_page_reachable(self, client):
-        # sqladmin mounts at /admin; unauthenticated /admin redirects to login
-        resp = await client.get("/admin", follow_redirects=False)
+        # sqladmin now mounts at /admin-sql to avoid collision with Next.js /admin (H11/M11)
+        resp = await client.get("/admin-sql", follow_redirects=False)
         assert resp.status_code in (302, 307)
 
     @pytest.mark.parametrize(
         ("path", "status"),
         [
-            ("/admin/product/list", (302, 307)),
-            ("/admin/order/list", (302, 307)),
-            ("/admin/coupon/list", (302, 307)),
+            ("/admin-sql/product/list", (302, 307)),
+            ("/admin-sql/order/list", (302, 307)),
+            ("/admin-sql/coupon/list", (302, 307)),
         ],
     )
     async def test_admin_requires_auth(self, client, path, status):

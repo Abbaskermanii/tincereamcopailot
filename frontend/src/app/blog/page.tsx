@@ -1,7 +1,50 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SectionHeading } from "@/components/ui/section-heading";
+
 export const revalidate = 300;
+
 export default async function BlogPage() {
   const articles = (await api.articles()) ?? [];
-  return <div className="mx-auto max-w-5xl px-4 py-12 md:px-6"><p className="text-sm text-ink-soft">یادداشت‌های کارگاه</p><h1 className="mt-2 text-4xl font-extrabold">مجله‌ی تن‌سِرام</h1><div className="mt-10 grid gap-5 md:grid-cols-2">{articles.map((a) => <Link key={a.id} href={`/blog/${a.slug}`} className="glaze-edge rounded-wobble bg-surface p-6 shadow-shelf transition-shadow hover:shadow-lifted dark:bg-white/5"><h2 className="text-xl font-bold">{a.title}</h2>{a.excerpt && <p className="mt-3 leading-8 text-ink-soft">{a.excerpt}</p>}<span className="mt-5 inline-block text-sm text-lajvard dark:text-firouzeh">خواندن مقاله ←</span></Link>)}</div>{!articles.length && <p className="mt-10 rounded-2xl bg-surface p-8 text-center text-ink-soft">هنوز مقاله‌ای منتشر نشده است.</p>}</div>;
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-12 md:px-6">
+      <SectionHeading
+        title="مقالات"
+        subtitle="اخبار، داستان‌ها و راهنمای سفال و سرامیک"
+      />
+
+      {articles.length === 0 ? (
+        <EmptyState
+          title="هنوز مقاله‌ای منتشر نشده"
+          description="به‌زودی مقالات جدیدی اضافه می‌کنیم."
+        />
+      ) : (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {articles.map((a) => (
+            <Link
+              key={a.slug}
+              href={`/blog/${a.slug}`}
+              className="group glaze-edge rounded-wobble bg-surface p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted"
+            >
+              <h3 className="font-bold transition-colors group-hover:text-lajvard dark:group-hover:text-lajvard-soft">
+                {a.title}
+              </h3>
+              {a.excerpt && (
+                <p className="mt-2 line-clamp-2 text-sm leading-7 text-char-soft dark:text-ink-soft">
+                  {a.excerpt}
+                </p>
+              )}
+              {a.published_at && (
+                <p className="mt-3 text-xs text-char-soft dark:text-ink-soft">
+                  {new Date(a.published_at).toLocaleDateString("fa-IR")}
+                </p>
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }

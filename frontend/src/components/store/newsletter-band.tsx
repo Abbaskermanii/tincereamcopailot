@@ -3,30 +3,32 @@
 import { useState, type FormEvent } from "react";
 import { useToast } from "@/components/ui/toast-provider";
 import { Button } from "@/components/ui/button";
-import { API_URL } from "@/lib/api";
 
 export function NewsletterBand() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
   const { toast } = useToast();
 
+  const [loading, setLoading] = useState(false);
   async function subscribe(e: FormEvent) {
     e.preventDefault();
-    if (!email.includes("@")) {
-      toast("ایمیل معتبر وارد کنید", "error");
-      return;
-    }
+    if (!email.includes("@") || loading) return;
+    setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/newsletter`, {
+      const { apiFetch } = await import("@/lib/api-client");
+      // بک‌اند email را به‌صورت query می‌گیرد (?email=)
+      const response = await apiFetch(`/newsletter?email=${encodeURIComponent(email)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ email }),
-      });
+        _noDedup: true,
+        _noCache: true,
+      } as RequestInit);
       if (!response.ok) throw new Error("newsletter request failed");
       setDone(true);
       toast("کد تخفیف ۱۵٪ اولین خرید برایتان ارسال می‌شود!");
     } catch {
       toast("ثبت ایمیل انجام نشد؛ دوباره تلاش کنید.", "error");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -62,8 +64,8 @@ export function NewsletterBand() {
             aria-label="نشانی ایمیل"
             className="num-latin h-12 flex-1 rounded-xl border-0 bg-white/95 px-4 text-char placeholder:text-char/50 focus:outline-none focus:ring-2 focus:ring-firouzeh"
           />
-          <Button type="submit" size="lg" variant="secondary" className="!border-white/60 !text-white hover:!bg-white/10">
-            عضویت
+          <Button type="submit" size="lg" variant="secondary" className="!border-white/60 !text-white hover:!bg-white/10" disabled={loading}>
+            {loading ? "..." : "عضویت"}
           </Button>
         </form>
       </div>

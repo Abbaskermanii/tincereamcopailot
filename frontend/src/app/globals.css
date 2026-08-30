@@ -36,6 +36,9 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* Focus Not Obscured (WCAG 2.2) — keep :focus above sticky header + sticky buy bar */
+    scroll-padding-top: 6rem;
+    scroll-padding-bottom: 5rem;
   }
   body {
     background-color: var(--bg);

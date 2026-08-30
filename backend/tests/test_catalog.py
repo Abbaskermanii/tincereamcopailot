@@ -64,7 +64,8 @@ class TestProductList:
     async def test_items_carry_primary_image(self, client):
         resp = await client.get("/api/v1/products", params={"page_size": 5})
         for item in resp.json()["items"]:
-            assert item["primary_image_url"].startswith("/products/")
+            # After media storage migration, URLs are /api/v1/media/seed/...; legacy static path was /products/
+            assert item["primary_image_url"].startswith(("/products/", "/api/v1/media/"))
 
 
 class TestProductDetail:

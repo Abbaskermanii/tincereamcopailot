@@ -18,6 +18,7 @@ class Article(UUIDMixin, TimestampMixin, table=True):
     slug: str = Field(max_length=255, unique=True, index=True)
     body: str = ""
     excerpt: str = ""
+    cover_url: str | None = Field(default=None, max_length=512)
     category_id: str | None = Field(default=None, foreign_key="article_categories.id")
     author_id: str | None = Field(default=None, foreign_key="users.id")
     is_published: bool = Field(default=False, index=True)
@@ -28,6 +29,7 @@ class Article(UUIDMixin, TimestampMixin, table=True):
 class Carousel(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "carousels"
     title: str = Field(max_length=255)
+    subtitle: str | None = Field(default=None, max_length=512)
     image_url: str = Field(max_length=1024)
     link_url: str | None = None
     sort_order: int = 0

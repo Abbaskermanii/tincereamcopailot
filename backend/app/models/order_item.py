@@ -15,6 +15,8 @@ class OrderItem(UUIDMixin, table=True):
 
     order_id: str = Field(foreign_key="orders.id")
     product_id: str = Field(foreign_key="products.id")
+    variant_id: str | None = Field(default=None, foreign_key="product_variants.id")
+    variant_name_snapshot: str | None = Field(default=None, max_length=128)
     product_name_snapshot: str = Field(max_length=255)
     unit_price_snapshot: float = Field(sa_column=Column(DECIMAL(14, 0), nullable=False))
     quantity: int = Field(gt=0)

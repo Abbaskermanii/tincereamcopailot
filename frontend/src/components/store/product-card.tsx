@@ -24,8 +24,8 @@ export function ProductCard({ product }: { product: CardProduct }) {
       className="group block focus-visible:outline-none"
       aria-label={product.name}
     >
-      <article className="glaze-edge h-full rounded-wobble bg-surface p-3 shadow-shelf transition-shadow duration-300 hover:shadow-lifted dark:bg-black/25">
-        <div className="kiln-reveal relative aspect-square overflow-hidden rounded-2xl bg-slip dark:bg-black/30">
+      <article className="glaze-edge h-full rounded-wobble bg-surface p-3 shadow-shelf transition-shadow duration-300 hover:shadow-lifted">
+        <div className="kiln-reveal relative aspect-square overflow-hidden rounded-2xl bg-slip dark:bg-surface">
           {product.primary_image_url ? (
             <Image
               src={mediaUrl(product.primary_image_url)}

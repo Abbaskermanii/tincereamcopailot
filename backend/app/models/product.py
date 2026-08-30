@@ -35,8 +35,10 @@ class Product(UUIDMixin, TimestampMixin, table=True):
     material: str | None = Field(default=None, max_length=255)
     dimensions: str | None = Field(default=None, max_length=255)
     is_active: bool = Field(default=True)
+    brand_id: str | None = Field(default=None, foreign_key="brands.id", index=True)
     meta_title: str | None = Field(default=None, max_length=255)
     meta_description: str | None = Field(default=None, max_length=512)
+    view_count: int = Field(default=0, index=True)
 
     category: "Category" = Relationship(back_populates="products")
     images: list["ProductImage"] = Relationship(back_populates="product")

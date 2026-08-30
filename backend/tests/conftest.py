@@ -5,16 +5,25 @@ import os
 # Must run before any app import so cached Settings pick up the test DB.
 os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+psycopg://ceramics_test:ceramics_test@db-test:5432/ceramics_test",
+    "postgresql+psycopg://ceramics_test:ceramics_test@localhost:5433/ceramics_test",
 )
+# Override Docker hostnames for services that tests need locally
+os.environ.setdefault("S3_ENDPOINT", "http://localhost:9000")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 import pytest  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlmodel import Session, SQLModel, select  # noqa: E402
 
+from app.core.config import get_settings  # noqa: E402
 from app.db.session import engine as app_engine  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models import Product as Product_  # noqa: E402
 from scripts.seed import seed  # noqa: E402
+
+# Clear settings cache so newly-set env vars (S3_ENDPOINT, REDIS_URL) take effect
+get_settings.cache_clear()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -94,9 +103,6 @@ def sample_product(seeded_session: Session) -> dict:
         "price": float(row.price),
         "stock_qty": row.stock_qty,
     }
-
-
-from app.models import Product as Product_  # noqa: E402
 
 
 @pytest.fixture()

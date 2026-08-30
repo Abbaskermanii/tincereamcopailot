@@ -80,11 +80,14 @@ class TestCouponValidateEndpoint:
 
 class TestCreateOrder:
     async def test_happy_path_creates_pending_order(self, client, sample_product):
+        from app.services.orders import FALLBACK_SHIPPING_FEE
+
         resp = await client.post("/api/v1/orders", json=_payload(sample_product))
         assert resp.status_code == 201
         body = resp.json()
         assert body["status"] == "pending"
-        assert body["total_amount"] == sample_product["price"]
+        # total includes fallback shipping (55k) when no shipping_method_id is sent
+        assert body["total_amount"] == sample_product["price"] + FALLBACK_SHIPPING_FEE
         assert body["payment_url"].startswith("https://sandbox.zarinpal.com/pg/StartPay/")
         assert len(body["items"]) == 1
         assert body["items"][0]["product_name_snapshot"] == sample_product["name"]
@@ -133,6 +136,8 @@ class TestCreateOrder:
         assert diff == 30000
 
     async def test_coupon_applied_to_order(self, client, seeded_session, sample_product):
+        from app.services.orders import FALLBACK_SHIPPING_FEE
+
         _make_coupon(seeded_session)
         payload = _payload(sample_product)
         payload["coupon_code"] = "WELCOME15"
@@ -140,7 +145,7 @@ class TestCreateOrder:
         body = resp.json()
         expected_discount = round(sample_product["price"] * 0.15)
         assert body["discount_amount"] == expected_discount
-        assert body["total_amount"] == sample_product["price"] - expected_discount
+        assert body["total_amount"] == sample_product["price"] - expected_discount + FALLBACK_SHIPPING_FEE
 
     async def test_invalid_coupon_at_checkout_fails(self, client, seeded_session, sample_product):
         _make_coupon(seeded_session, min_order_amount=999999999)

@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.core.config import get_settings
 from app.db.session import get_session
-from app.models import Category, Product, ProductImage
+from app.models import Category, Product, ProductImage, ShippingMethod
 
 router = APIRouter()
 
@@ -65,6 +65,9 @@ async def google_feed(session: Session = Depends(get_session)) -> Response:
     s = get_settings()
     rows = _active_products(session)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S%z")
+    # Get default shipping cost from database
+    shipping = session.exec(select(ShippingMethod).where(ShippingMethod.is_active == True).limit(1)).first()  # type: ignore[arg-type]
+    default_shipping_cost = int(shipping.cost) if shipping else 55000
     items = []
     for p, cat, img in rows:
         image_url = _abs_url(img.url) if img else ""
@@ -92,7 +95,7 @@ async def google_feed(session: Session = Depends(get_session)) -> Response:
         <g:shipping>
             <g:country>IR</g:country>
             <g:service>Standard</g:service>
-            <g:price>55000 IRT</g:price>
+            <g:price>{default_shipping_cost} IRT</g:price>
         </g:shipping>
     </item>"""
         )

@@ -6,7 +6,6 @@ import { Check, Package, Truck, BadgeCheck, Home, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { API_URL } from "@/lib/api";
 import { toPersianDigits, faNum } from "@/lib/format";
 
 const STEPS = [
@@ -32,7 +31,11 @@ function TrackInner() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/orders/${encodeURIComponent(no.trim())}/status`);
+      const { apiFetch } = await import("@/lib/api-client");
+      const res = await apiFetch(`/orders/${encodeURIComponent(no.trim())}/status`, {
+        _noCache: true,
+        _noDedup: true,
+      } as RequestInit);
       if (!res.ok) {
         setStatus(null);
         setError("سفارشی با این شماره پیدا نشد.");
@@ -52,8 +55,33 @@ function TrackInner() {
     if (initial) void lookup(initial);
   }, [params, lookup]);
 
+  const [paying, setPaying] = useState(false);
   const activeIndex = status ? STEPS.findIndex((s) => s.key === status) : -1;
   const cancelled = status === CANCELLED;
+
+  const retryPay = useCallback(async () => {
+    if (!orderNo.trim() || paying) return;
+    setPaying(true);
+    setError("");
+    try {
+      const { apiFetch } = await import("@/lib/api-client");
+      const res = await apiFetch(`/orders/${encodeURIComponent(orderNo.trim())}/pay`, {
+        _noCache: true,
+        _noDedup: true,
+      } as RequestInit);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.detail || data.message || "پرداخت مجدد ممکن نشد.");
+      } else if (data.payment_url) {
+        window.location.href = data.payment_url;
+        return;
+      }
+    } catch {
+      setError("ارتباط با سرور برقرار نشد.");
+    } finally {
+      setPaying(false);
+    }
+  }, [orderNo, paying]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-14">
@@ -135,6 +163,14 @@ function TrackInner() {
               );
             })}
           </ol>
+          {status === "pending" && (
+            <div className="mt-8 rounded-wobble bg-lajvard/10 p-4 dark:bg-lajvard-soft/10">
+              <p className="text-sm">این سفارش در انتظار پرداخت است. می‌توانید پرداخت را دوباره آغاز کنید.</p>
+              <Button onClick={() => void retryPay()} disabled={paying} className="mt-3">
+                {paying ? "در حال اتصال به درگاه..." : "پرداخت مجدد"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

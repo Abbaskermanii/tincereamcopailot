@@ -8,7 +8,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlmodel import Session, func, select
 
 from app.db.session import engine
-from app.models import Category, Coupon, DiscountType, Product, ProductImage
+from app.core.permissions import ROLE_PRESETS
+from app.core.security import hash_password
+from app.core.config import get_settings
+from app.models import (
+    Category,
+    Coupon,
+    DiscountType,
+    FAQItem,
+    HomepageSection,
+    Product,
+    ProductImage,
+    Role,
+    ShippingMethod,
+    StaticPage,
+    User,
+)
 from app.services.storage import put_image
 from scripts.seed_data import build_rows
 
@@ -74,7 +89,83 @@ def seed(session: Session) -> None:
         dtype = payload.pop("discount_type")
         session.add(Coupon(discount_type=DiscountType(dtype), **payload))
 
+    _seed_ops_data(session)
     session.commit()
+
+
+def _seed_ops_data(session: Session) -> None:
+    """Idempotent bootstrap: roles, admin account, shipping methods, pages, FAQ."""
+
+    def first(model, **kw):
+        return session.exec(select(model).where(*[(getattr(model, k) == v) for k, v in kw.items()])).first()
+
+    # roles
+    for preset in ROLE_PRESETS:
+        role = first(Role, name=preset["name"])
+        if not role:
+            session.add(Role(name=preset["name"], permissions=",".join(preset["permissions"])))
+
+    # superadmin account from settings
+    s = get_settings()
+    admin_role = first(Role, name="superadmin")
+    user = first(User, email=s.seed_admin_email)
+    if not user:
+        user = User(
+            email=s.seed_admin_email,
+            password_hash=hash_password(s.seed_admin_password),
+            full_name="مدیر فروشگاه",
+            is_admin=True,
+            role_id=admin_role.id if admin_role else None,
+        )
+        session.add(user)
+    elif not user.is_admin:
+        user.is_admin = True
+        user.role_id = admin_role.id if admin_role else user.role_id
+        session.add(user)
+
+    # shipping methods
+    methods = [
+        dict(name="پست پیشتاز (سراسر کشور)", code="pishtaz", cost=55000, free_over_amount=3000000,
+             estimated_days_min=2, estimated_days_max=5, sort_order=1),
+        dict(name="پست سفارشی", code="post-sefareshi", cost=38000, free_over_amount=None,
+             estimated_days_min=3, estimated_days_max=7, sort_order=2),
+        dict(name="تیپاکس (پس‌کرایه)", code="tipax", cost=0, free_over_amount=None,
+             estimated_days_min=1, estimated_days_max=3, sort_order=3),
+        dict(name="تحویل حضوری در فروشگاه", code="pickup", cost=0, free_over_amount=None,
+             estimated_days_min=0, estimated_days_max=1, sort_order=4),
+    ]
+    for m in methods:
+        if not first(ShippingMethod, code=m["code"]):
+            session.add(ShippingMethod(**m))
+
+    # static pages
+    pages = [
+        dict(title="درباره تن‌سِرام", slug="about", content="<p>تن‌سِرام فروشگاه صنایع دستی سرامیکی است.</p>", is_published=True, sort_order=1),
+        dict(title="شرایط استفاده", slug="terms", content="<p>با استفاده از سایت شرایط را می‌پذیرید.</p>", is_published=True, sort_order=2),
+        dict(title="حریم خصوصی", slug="privacy-policy", content="<p>اطلاعات شما محفوظ است.</p>", is_published=True, sort_order=3),
+        dict(title="قوانین مرجوعی", slug="returns-policy", content="<p>تا ۷ روز امکان مرجوعی وجود دارد.</p>", is_published=True, sort_order=4),
+    ]
+    for pg in pages:
+        if not first(StaticPage, slug=pg["slug"]):
+            session.add(StaticPage(**pg))
+
+    faqs = [
+        ("سفارش من چه زمانی ارسال می‌شود؟", "سفارش‌ها حداکثر تا ۲ روز کاری پس از تأیید پرداخت ارسال می‌شوند.", "ارسال", 1),
+        ("امکان مرجوع کردن کالا وجود دارد؟", "بله، تا ۷ روز پس از تحویل می‌توانید درخواست مرجوعی ثبت کنید.", "مرجوعی", 2),
+        ("هزینه ارسال چقدر است؟", "هزینه ارسال به روش ارسال انتخابی بستگی دارد و در صفحه پرداخت نمایش داده می‌شود.", "ارسال", 3),
+        ("آیا محصولات دست‌ساز هستند؟", "بله، تمام محصولات تن‌سِرام به‌صورت دستی ساخته و لعاب‌کاری می‌شوند.", "محصولات", 4),
+    ]
+    existing_faqs = session.exec(select(func.count()).select_from(FAQItem)).one()
+    if not existing_faqs:
+        for q, a, cat, order in faqs:
+            session.add(FAQItem(question=q, answer=a, category=cat, sort_order=order))
+
+    # homepage layout (only on first run)
+    existing_sections = session.exec(select(func.count()).select_from(HomepageSection)).one()
+    if not existing_sections:
+        from app.services.homepage import default_sections
+        for section in default_sections():
+            session.add(section)
 
 
 def is_seeded(session: Session) -> bool:

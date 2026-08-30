@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 from app.db.session import get_session
 from app.models import *
 from app.api.v1.auth import admin_user, current_user
+from app.services.homepage import invalidate_home
 from app.services.storage import put_image
 
 admin = APIRouter(prefix="/admin")
@@ -78,7 +79,7 @@ def delete_coupon(coupon_id: str, _: User = Depends(admin_user), s: Session = De
 
 @admin.post("/carousels", status_code=201)
 def create_carousel(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
-    row = Carousel(**data); s.add(row); s.commit(); s.refresh(row); return row
+    row = Carousel(**data); s.add(row); s.commit(); invalidate_home(); s.refresh(row); return row
 
 
 @admin.get("/carousels")
@@ -92,14 +93,14 @@ def update_carousel(carousel_id: str, data: dict, _: User = Depends(admin_user),
     if not row: raise HTTPException(404, "بنر یافت نشد")
     for key, value in data.items():
         if hasattr(row, key): setattr(row, key, value)
-    s.add(row); s.commit(); return row
+    s.add(row); s.commit(); invalidate_home(); return row
 
 
 @admin.delete("/carousels/{carousel_id}")
 def delete_carousel(carousel_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     row = s.get(Carousel, carousel_id)
     if not row: raise HTTPException(404, "بنر یافت نشد")
-    s.delete(row); s.commit(); return {"ok": True}
+    s.delete(row); s.commit(); invalidate_home(); return {"ok": True}
 
 
 @public.get("/carousels")
@@ -120,10 +121,11 @@ def add_image(product_id: str, data: dict, _: User = Depends(admin_user), s: Ses
 @admin.post("/products/{product_id}/images/upload", status_code=201)
 async def upload_image(product_id: str, file: UploadFile = File(...), _: User = Depends(admin_user), s: Session = Depends(get_session)):
     if not s.get(Product, product_id): raise HTTPException(404, "محصول یافت نشد")
-    if file.content_type not in {"image/jpeg", "image/png", "image/webp"}: raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود")
+    allowed = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    if file.content_type not in allowed: raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود")
     data = await file.read()
     if len(data) > 5 * 1024 * 1024: raise HTTPException(413, "حجم تصویر زیاد است")
-    extension = (file.filename or "image").rsplit(".", 1)[-1].lower()
+    extension = allowed[file.content_type or "image/jpeg"]
     object_name = f"products/{product_id}/{secrets.token_hex(12)}.{extension}"
     image = ProductImage(product_id=product_id, url=put_image(object_name, data, file.content_type or "application/octet-stream"), alt_text=file.filename or "")
     s.add(image); s.commit(); s.refresh(image); return image
@@ -145,7 +147,10 @@ def delete_image(product_id: str, image_id: str, _: User = Depends(admin_user), 
 
 class ProductIn(BaseModel):
     name: str; slug: str; category_id: str; price: float; sku: str
-    description: str = ""; stock_qty: int = 0; is_active: bool = True
+    description: str = ""; short_description: str | None = None
+    stock_qty: int = 0; is_active: bool = True
+    brand_id: str | None = None
+    compare_at_price: float | None = None
 
 @admin.post("/products", status_code=201)
 def create_product(p: ProductIn, _: User = Depends(admin_user), s: Session = Depends(get_session)):
@@ -160,7 +165,8 @@ def products(_: User = Depends(admin_user), s: Session = Depends(get_session), o
 @admin.patch("/products/{product_id}")
 def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     row = s.get(Product, product_id)
-    if not row: raise HTTPException(404, "محصول یافت نشد")
+    if not row:
+        raise HTTPException(404, "محصول یافت نشد")
     if "category_id" in p and not s.get(Category, p["category_id"]):
         raise HTTPException(400, "دسته محصول یافت نشد")
     if "slug" in p or "sku" in p:
@@ -172,9 +178,16 @@ def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: S
         ).first()
         if duplicate:
             raise HTTPException(409, "slug یا SKU تکراری است")
-    for k,v in p.items():
-        if hasattr(row,k): setattr(row,k,v)
-    s.add(row); s.commit(); s.refresh(row); return row
+    # M4 fix: allowlist to prevent mass assignment of id/created_at etc.
+    allowed = {"name", "slug", "category_id", "description", "short_description", "price", "compare_at_price", "stock_qty", "sku", "weight_grams", "material", "dimensions", "is_active", "brand_id", "meta_title", "meta_description"}
+    for k, v in p.items():
+        if k in allowed:
+            setattr(row, k, v)
+    s.add(row)
+    s.commit()
+    s.refresh(row)
+    invalidate_home()
+    return row
 
 @admin.delete("/products/{product_id}")
 def delete_product(product_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
@@ -197,7 +210,7 @@ def public_related(product_id: str, s: Session = Depends(get_session)):
     return s.exec(select(Product).where(Product.id.in_(ids), Product.is_active == True)).all() if ids else []
 
 class ArticleIn(BaseModel):
-    title: str; slug: str; body: str; excerpt: str = ""; category_id: str | None = None; is_published: bool = False
+    title: str; slug: str; body: str; excerpt: str = ""; cover_url: str | None = None; category_id: str | None = None; is_published: bool = False
 
 
 @admin.post("/article-categories", status_code=201)
@@ -243,25 +256,68 @@ def delete_article_category(category_id: str, _: User = Depends(admin_user), s: 
 
 @admin.get("/articles")
 def admin_articles(_: User = Depends(admin_user), s: Session = Depends(get_session)):
-    return s.exec(select(Article).order_by(Article.created_at.desc())).all()
+    rows = s.exec(select(Article).order_by(Article.created_at.desc())).all()
+    cats = {c.id: c.name for c in s.exec(select(ArticleCategory)).all()}
+    return [
+        {
+            **{k: getattr(a, k) for k in ("id", "title", "slug", "excerpt", "cover_url", "category_id", "is_published", "published_at", "created_at")},
+            "category_name": cats.get(a.category_id) if a.category_id else None,
+        }
+        for a in rows
+    ]
+
+def _sanitize_html(raw: str) -> str:
+    """Minimal sanitization for Article.body — strip script/style and on* handlers."""
+    import re
+
+    # Remove script/style/iframe/object/embed tags and content
+    cleaned = re.sub(r"<(script|style|iframe|object|embed|link|meta)[^>]*>.*?</\1>", "", raw, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = re.sub(r"<(script|style|iframe|object|embed|link|meta)[^>]*/?>", "", cleaned, flags=re.IGNORECASE)
+    # Remove event handlers like onclick= (quoted, single-quoted, and unquoted)
+    cleaned = re.sub(r"\s+on\w+\s*=\s*\"[^\"]*\"", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+on\w+\s*=\s*'[^']*'", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+on\w+\s*=\s*[^\s\"'>]+", "", cleaned, flags=re.IGNORECASE)
+    # Remove javascript: and data: URLs
+    cleaned = re.sub(r"javascript\s*:", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"data\s*:\s*text/html", "", cleaned, flags=re.IGNORECASE)
+    # Remove style attributes with expression() or javascript:
+    cleaned = re.sub(r"\s+style\s*=\s*\"[^\"]*expression[^\"]*\"", "", cleaned, flags=re.IGNORECASE)
+    return cleaned
+
 
 @admin.post("/articles", status_code=201)
 def create_article(p: ArticleIn, u: User = Depends(admin_user), s: Session = Depends(get_session)):
     if s.exec(select(Article).where(Article.slug == p.slug)).first():
         raise HTTPException(409, "slug تکراری است")
-    row=Article(**p.model_dump(), author_id=u.id); s.add(row); s.commit(); s.refresh(row); return row
+    data = p.model_dump()
+    data["body"] = _sanitize_html(data["body"])
+    data["excerpt"] = _sanitize_html(data["excerpt"])
+    row = Article(**data, author_id=u.id)
+    s.add(row)
+    s.commit()
+    s.refresh(row)
+    return row
 
 
 @admin.patch("/articles/{article_id}")
 def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     row = s.get(Article, article_id)
-    if not row: raise HTTPException(404, "مقاله یافت نشد")
+    if not row:
+        raise HTTPException(404, "مقاله یافت نشد")
     if "slug" in data and s.exec(select(Article).where(Article.slug == data["slug"], Article.id != article_id)).first():
         raise HTTPException(409, "slug تکراری است")
+    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "published_at"}
     for key, value in data.items():
-        if hasattr(row, key): setattr(row, key, value)
-    if data.get("is_published") and row.published_at is None: row.published_at = datetime.now(UTC)
-    s.add(row); s.commit(); return row
+        if key in allowed:
+            if key in ("body", "excerpt") and isinstance(value, str):
+                value = _sanitize_html(value)
+            setattr(row, key, value)
+    if data.get("is_published") and row.published_at is None:
+        row.published_at = datetime.now(UTC)
+    s.add(row)
+    s.commit()
+    invalidate_home()
+    return row
 
 
 @admin.delete("/articles/{article_id}")
@@ -283,13 +339,39 @@ def admin_orders(_: User = Depends(admin_user), s: Session = Depends(get_session
     return s.exec(query.offset(offset).limit(limit)).all()
 
 
+@admin.post("/orders/expire-stale")
+def expire_stale_orders_admin(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+    """Expire pending orders older than 30 minutes and restore stock (Phase 5 TTL)."""
+    from app.services.orders import expire_stale_pending_orders
+
+    count = expire_stale_pending_orders(s, ttl_minutes=30)
+    return {"expired": count, "message": f"{count} سفارش منقضی و موجودی بازگردانده شد."}
+
+
 @admin.patch("/orders/{order_id}/status")
 def update_order_status(order_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     row = s.get(Order, order_id)
-    if not row: raise HTTPException(404, "سفارش یافت نشد")
+    if not row:
+        raise HTTPException(404, "سفارش یافت نشد")
     allowed = {"pending", "paid", "processing", "shipped", "delivered", "cancelled"}
-    if data.get("status") not in allowed: raise HTTPException(400, "وضعیت نامعتبر است")
-    row.status = data["status"]; s.add(row); s.commit(); return row
+    new_status = data.get("status")
+    if new_status not in allowed:
+        raise HTTPException(400, "وضعیت نامعتبر است")
+    current = row.status.value if hasattr(row.status, "value") else str(row.status)
+    if new_status == current:
+        return row
+    if new_status == "cancelled":
+        from app.services.orders import cancel_order_and_restock
+
+        cancel_order_and_restock(s, row, note="لغو توسط مدیر (مسیر قدیمی)")
+    else:
+        from app.services.orders import add_status_history
+
+        row.status = new_status  # type: ignore[assignment]
+        s.add(row)
+        add_status_history(s, row, new_status, note=f"تغییر وضعیت از {current} توسط مدیر")
+    s.commit()
+    return row
 
 @public.get("/articles")
 def articles(s: Session = Depends(get_session), offset: int=0, limit: int=Query(20,le=100)):
@@ -327,6 +409,14 @@ def unsubscribe(email: str, s: Session = Depends(get_session)):
     row=s.exec(select(NewsletterSubscription).where(NewsletterSubscription.email==email.lower())).first()
     if row: row.unsubscribed_at=datetime.now(UTC); s.add(row); s.commit()
     return {"ok":True}
+
+@public.get("/shipping-methods")
+def public_shipping_methods(s: Session = Depends(get_session)):
+    """Active shipping methods for storefront checkout (no auth required)."""
+    return s.exec(
+        select(ShippingMethod).where(ShippingMethod.is_active == True).order_by(ShippingMethod.sort_order)  # noqa: E712
+    ).all()
+
 
 @public.get("/notifications")
 def notifications(u: User=Depends(current_user), s: Session=Depends(get_session)):

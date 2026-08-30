@@ -12,6 +12,13 @@ const config: Config = {
         slip: { DEFAULT: "#EDEAE3", raised: "#F6F4EF" },
         char: { DEFAULT: "#26221F", soft: "#57514B" },
         copper: "#9C6B5E",
+        // Semantic tokens mapped to CSS vars (globals.css --surface/--bg/--ink)
+        surface: "var(--surface)",
+        bg: "var(--bg)",
+        ink: { DEFAULT: "var(--ink)", soft: "var(--ink-soft)" },
+        brand: "var(--brand)",
+        accent: "var(--accent)",
+        warm: "var(--warm)",
       },
       fontFamily: {
         vazir: ["var(--font-vazir)", "Tahoma", "sans-serif"],

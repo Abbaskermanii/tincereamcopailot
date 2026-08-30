@@ -19,9 +19,9 @@ export function RecentlyViewed({ excludeSlug }: { excludeSlug?: string }) {
           <Link
             key={r.slug}
             href={`/product/${r.slug}`}
-            className="glaze-edge w-40 shrink-0 overflow-hidden rounded-wobble bg-surface p-2 shadow-shelf dark:bg-black/25"
+            className="glaze-edge w-40 shrink-0 overflow-hidden rounded-wobble bg-surface p-2 shadow-shelf"
           >
-            <div className="relative aspect-square overflow-hidden rounded-xl bg-slip dark:bg-black/30">
+            <div className="relative aspect-square overflow-hidden rounded-xl bg-slip dark:bg-surface">
               {r.imageUrl && (
                 <Image src={mediaUrl(r.imageUrl)} alt={r.name} fill sizes="160px" className="object-cover" />
               )}

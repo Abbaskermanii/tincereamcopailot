@@ -5,15 +5,48 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast-provider";
 
+
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // MVP: no backend mailbox yet; acknowledge locally.
-    setSent(true);
-    toast("پیام شما ذخیره شد؛ به‌زودی پاسخ می‌دهیم.");
+    if (submitting) return;
+    setSubmitting(true);
+    const form = new FormData(e.currentTarget);
+    const payload = {
+      name: String(form.get("name") ?? "").trim(),
+      email: String(form.get("email") ?? "").trim() || null,
+      phone: String(form.get("phone") ?? "").trim() || null,
+      subject: String(form.get("subject") ?? "").trim(),
+      message: String(form.get("message") ?? "").trim(),
+    };
+    try {
+      const { apiFetch } = await import("@/lib/api-client");
+      const res = await apiFetch(`/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        _noDedup: true,
+        _noCache: true,
+      } as RequestInit);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.detail ?? data.message ?? "ارسال پیام ناموفق بود. دوباره تلاش کنید.";
+        // Handle FastAPI validation array
+        const detailMsg = Array.isArray(data.detail) ? data.detail.map((d: { msg: string }) => d.msg).join("، ") : msg;
+        toast(typeof detailMsg === "string" ? detailMsg : msg, "error");
+        setSubmitting(false);
+        return;
+      }
+      setSent(true);
+      toast(data.message ?? "پیام شما دریافت شد؛ به‌زودی پاسخ می‌دهیم.", "success");
+    } catch {
+      toast("ارتباط با سرور برقرار نشد. اتصال اینترنت را بررسی کنید.", "error");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -23,7 +56,7 @@ export default function ContactPage() {
         سفارش سفارشی، عمده‌فروشی یا فقط سلام؟ خوشحال می‌شویم بشنویم.
       </p>
 
-      <dl className="mt-8 grid gap-4 rounded-wobble bg-surface p-6 text-sm shadow-shelf sm:grid-cols-2 dark:bg-black/25">
+      <dl className="mt-8 grid gap-4 rounded-wobble bg-surface p-6 text-sm shadow-shelf sm:grid-cols-2">
         <div>
           <dt className="font-bold">ساعات کارگاه</dt>
           <dd className="mt-1 text-char-soft dark:text-ink-soft">شنبه تا چهارشنبه، ۹ تا ۱۷</dd>
@@ -51,15 +84,26 @@ export default function ContactPage() {
       ) : (
         <form onSubmit={submit} className="mt-8 space-y-4">
           <Field label="نام" required>
-            <Input name="name" required />
+            <Input name="name" required minLength={2} maxLength={128} autoComplete="name" />
           </Field>
-          <Field label="ایمیل" required>
-            <Input name="email" type="email" required dir="ltr" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="ایمیل (یا موبایل را پر کنید)" >
+              <Input name="email" type="email" dir="ltr" placeholder="you@example.com" autoComplete="email" />
+            </Field>
+            <Field label="موبایل (اختیاری، 11 رقم)">
+              <Input name="phone" dir="ltr" placeholder="09121234567" pattern="09\d{9}" inputMode="numeric" autoComplete="tel" />
+            </Field>
+          </div>
+          <p className="text-xs text-char-soft dark:text-ink-soft">حداقل یکی از ایمیل یا موبایل معتبر (09xxxxxxxxx) الزامی است.</p>
+          <Field label="موضوع (اختیاری)">
+            <Input name="subject" maxLength={255} placeholder="در مورد سفارش، همکاری، …" />
           </Field>
           <Field label="پیام" required>
-            <Textarea name="message" required minLength={10} />
+            <Textarea name="message" required minLength={10} maxLength={4000} placeholder="پیام خود را بنویسید…" />
           </Field>
-          <Button type="submit">ارسال پیام</Button>
+          <Button type="submit" disabled={submitting} className="min-w-32">
+            {submitting ? "در حال ارسال…" : "ارسال پیام"}
+          </Button>
         </form>
       )}
     </div>

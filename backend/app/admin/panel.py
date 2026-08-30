@@ -92,11 +92,13 @@ def _register_views(admin: Admin) -> None:
 
 
 def mount_admin(app: FastAPI) -> None:
+    # Mount legacy SQLAdmin at /admin-sql to avoid collision with Next.js admin at /admin (H11/M11)
+    # Production nginx should route /admin/* to Next.js (3000) and /admin-sql/* to FastAPI (8000)
     admin = Admin(
         app,
         engine=engine,
-        base_url="/admin",
-        title="تن‌سِرام | پنل مدیریت",
+        base_url="/admin-sql",
+        title="تن‌سِرام | پنل مدیریت (قدیمی)",
         authentication_backend=EnvAuth(secret_key=get_settings().secret_key),
     )
     _register_views(admin)

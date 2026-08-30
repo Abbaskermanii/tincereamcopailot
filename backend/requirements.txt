@@ -19,6 +19,7 @@ itsdangerous==2.2.0
 # Settings / validation
 pydantic==2.10.4
 pydantic-settings==2.7.0
+email-validator==2.2.0
 
 # Authentication / password hashing
 passlib[bcrypt]==1.7.4

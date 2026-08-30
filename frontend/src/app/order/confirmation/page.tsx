@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ClearCartOnConfirm } from "./clear-cart";
 
 export const metadata: Metadata = {
   title: "ثبت سفارش موفق",
@@ -20,6 +21,7 @@ export default async function OrderConfirmationPage({
 
   return (
     <div className="mx-auto max-w-xl px-4 py-24 text-center">
+      {orderNumber ? <ClearCartOnConfirm /> : null}
       <div className="glaze-edge mx-auto mb-8 inline-block rounded-wobble bg-surface px-10 py-12 shadow-lifted dark:bg-black/25">
         <p className="text-5xl" aria-hidden>🏺</p>
         <h1 className="mt-6 text-2xl font-extrabold">سفارش شما ثبت شد</h1>

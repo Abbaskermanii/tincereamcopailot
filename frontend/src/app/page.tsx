@@ -1,98 +1,181 @@
-import Image from "next/image";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { api, mediaUrl } from "@/lib/api";
-import { ProductCard } from "@/components/store/product-card";
-import { SectionHeading } from "@/components/ui/section-heading";
+import { api, type ProductListItem } from "@/lib/api";
+import { ProductSection } from "@/components/store/product-section";
+import { CategorySection } from "@/components/store/category-section";
+import { ArticleSection } from "@/components/store/article-section";
+import { FAQSection } from "@/components/store/faq-section";
 import { NewsletterBand } from "@/components/store/newsletter-band";
+import { HomeCarousel } from "@/components/store/home-carousel";
 
 export const revalidate = 120;
 
+interface CategoryItem {
+  id?: string;
+  name: string;
+  slug: string;
+  image_url?: string | null;
+  description?: string | null;
+}
+
+interface ArticleItem {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | undefined;
+  published_at: string | undefined;
+}
+
+interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
 export default async function HomePage() {
-  const latest = await api.products({ page_size: 8, sort: "newest" });
-  const categories = await api.categories();
-  const categoryTiles = await Promise.all(
-    (categories ?? []).slice(0, 4).map(async (category) => {
-      const products = await api.products({ category: category.slug, page_size: 1, sort: "newest" });
-      return { ...category, image_url: category.image_url ?? products?.items[0]?.primary_image_url };
-    }),
-  );
+  // ابتدا فقط homepage را بگیر — اگر موفق بود، 5 درخواست fallback اصلاً زده نمی‌شود (کاهش 83% فشار)
+  const homepageRes = await api.homepage();
+  const sections = homepageRes?.sections ?? null;
+
+  if (sections && sections.length > 0) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 md:px-6">
+        {sections.map((sec) => {
+          if (sec.kind === "hero" && sec.slides && sec.slides.length > 0) {
+            return (
+              <div key={sec.id} className="py-6">
+                <HomeCarousel slides={sec.slides.map((s: { id: string; title: string | null; subtitle: string | null; image_url: string; link_url: string | null }, idx: number) => ({ ...s, sort_order: idx, is_active: true }))} />
+              </div>
+            );
+          }
+          if (sec.kind === "products" && sec.products) {
+            return <ProductSection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} products={sec.products as ProductListItem[]} />;
+          }
+          if (sec.kind === "categories" && sec.categories) {
+            return <CategorySection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} categories={sec.categories as CategoryItem[]} limit={8} />;
+          }
+          if (sec.kind === "articles" && sec.articles) {
+            return <ArticleSection key={sec.id} title={sec.title} articles={sec.articles as ArticleItem[]} limit={4} />;
+          }
+          if (sec.kind === "faq" && sec.faq) {
+            return <FAQSection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} faq_items={sec.faq as FaqItem[]} limit={5} />;
+          }
+          if (sec.kind === "newsletter") {
+            return <NewsletterBand key={sec.id} />;
+          }
+          return null;
+        })}
+      </div>
+    );
+  }
+
+  // Fallback: فقط وقتی homepage در دسترس نیست — 4 درخواست موازی با حجم کمتر (16 به‌جای 50)
+  const [fallbackProducts, fallbackCategories, fallbackArticles, fallbackFaq, fallbackCarousels] = await Promise.all([
+    api.products({ page_size: 24 }),
+    api.categories(),
+    api.articles(),
+    api.faq(),
+    api.carousels(),
+  ]);
+
+  // Fallback data preparation (used only when homepage API unavailable)
+  const fallbackAllProducts: ProductListItem[] = fallbackProducts?.items ?? [];
+  const fallbackAllCategories: CategoryItem[] = (fallbackCategories ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    image_url: c.image_url,
+    description: c.description,
+  }));
+  const fallbackAllArticles: ArticleItem[] = (fallbackArticles ?? []).map((a) => ({
+    id: a.id,
+    title: a.title,
+    slug: a.slug,
+    excerpt: a.excerpt,
+    published_at: a.published_at,
+  }));
+  const fallbackAllFaq: FaqItem[] = (fallbackFaq ?? []).map((f) => ({
+    id: f.id,
+    question: f.question,
+    answer: f.answer,
+    category: f.category,
+    sort_order: f.sort_order,
+    is_active: f.is_active,
+  }));
+  const fallbackSlides = (fallbackCarousels ?? []).filter((c) => c.is_active !== false);
+
+  // Fallback rendering (legacy) — فقط وقتی homepage خالی است
+  const featuredProducts = fallbackAllProducts.filter(
+    (p) => (p.compare_at_price && p.compare_at_price > p.price) || p.stock_qty > 0
+  ).slice(0, 8);
+  const newArrivals = fallbackAllProducts
+    .slice()
+    .sort((a, b) => (b.slug ?? "").localeCompare(a.slug ?? ""))
+    .slice(0, 8);
+  const bestSellers = fallbackAllProducts.filter((p) => p.stock_qty > 0).slice(0, 8);
+  const discountedProducts = fallbackAllProducts.filter(
+    (p) => p.compare_at_price && p.compare_at_price > p.price
+  ).slice(0, 8);
 
   return (
     <div className="mx-auto max-w-7xl px-4 md:px-6">
-      {/* ——— Hero ——— */}
-      <section className="grid items-center gap-10 py-12 md:grid-cols-2 md:py-20">
-        <div className="order-2 md:order-1">
-          <p className="mb-4 inline-flex rounded-full bg-firouzeh/15 px-3 py-1 text-xs font-medium text-[#3f5f56] dark:text-firouzeh-soft">
-            پخت تازه از کورهٔ شمارهٔ ۲
-          </p>
-          <h1 className="text-4xl font-extrabold leading-[1.2] md:text-6xl md:leading-[1.15]">
-            سفال، با دستِ
-            <span className="text-lajvard dark:text-lajvard-soft"> ایرانی</span> گرم می‌شود.
-          </h1>
-          <p className="mt-5 max-w-md text-base leading-8 text-char-soft dark:text-ink-soft">
-            هر ماگ و هر کوزه، یکتاست؛ روی چرخ شکل گرفته، با دست لعاب خورده و در
-            کورهٔ چوب‌سوزِ کارگاه ما جان گرفته است.
-          </p>
-          <Link
-            href="/category/handmade-mugs"
-            className="glaze-edge mt-8 inline-flex h-13 items-center gap-2 bg-lajvard px-8 font-medium text-slip transition-colors hover:bg-lajvard-deep dark:bg-lajvard-soft dark:text-char"
-          >
-            دیدن مجموعه‌ها
-            <ArrowLeft size={18} />
-          </Link>
+      {fallbackSlides.length > 0 && (
+        <div className="py-6">
+          <HomeCarousel slides={fallbackSlides.map((c) => ({
+            id: c.id,
+            title: c.title,
+            subtitle: c.subtitle ?? null,
+            image_url: c.image_url,
+            link_url: c.link_url,
+            sort_order: c.sort_order,
+            is_active: c.is_active,
+          }))} />
         </div>
-        <div className="kiln-reveal order-1 overflow-hidden rounded-wobble shadow-lifted md:order-2">
-          {latest?.items[0]?.primary_image_url && <Image src={mediaUrl(latest.items[0].primary_image_url)} alt={latest.items[0].name} width={720} height={720} priority className="h-auto w-full object-cover" />}
-        </div>
-      </section>
+      )}
 
-      {/* ——— Category tiles ——— */}
-      <section aria-labelledby="cats-h" className="py-10">
-        <h2 id="cats-h" className="sr-only">دسته‌بندی‌ها</h2>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {categoryTiles.map((c) => (
-            <Link key={c.slug} href={`/category/${c.slug}`} className="group">
-              <div className="glaze-edge overflow-hidden rounded-wobble bg-surface p-3 shadow-shelf transition-shadow hover:shadow-lifted dark:bg-black/25">
-                <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slip dark:bg-black/30">
-                  {c.image_url && <Image src={mediaUrl(c.image_url)} alt={`مجموعهٔ ${c.name}`} fill sizes="(max-width:768px) 50vw, 25vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />}
-                </div>
-                <p className="pt-3 pb-1 text-center font-semibold">{c.name}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* ——— Latest products ——— */}
-      <section aria-labelledby="new-h" className="py-14">
-        <SectionHeading
-          title="تازه‌های کوره"
-          subtitle="آخرین سفال‌هایی که از کوره بیرون آمدند"
+      <ProductSection
+        title="پیشنهادات ویژه"
+        subtitle="بهترین انتخاب‌ها با قیمت استثنایی"
+        products={featuredProducts}
+      />
+      <ProductSection
+        title="جدیدترین محصولات"
+        subtitle="تازه‌های کارگاه تن‌سِرام"
+        products={newArrivals}
+      />
+      <ProductSection
+        title="محبوب‌ترین‌ها"
+        subtitle="پرفروش‌های ما در میان مشتریان"
+        products={bestSellers}
+      />
+      {discountedProducts.length > 0 && (
+        <ProductSection
+          title="تخفیف‌های ویژه"
+          subtitle="فرصت‌های محدود با قیمت‌های باورنکردنی"
+          products={discountedProducts}
         />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {(latest?.items ?? []).slice(0, 8).map((p) => (
-            <ProductCard key={p.id} product={p} />
-          ))}
-        </div>
-      </section>
+      )}
 
-      {/* ——— Story band (asymmetric) ——— */}
-      <section className="my-16 grid items-center gap-8 md:grid-cols-5">
-        <div className="kiln-reveal relative overflow-hidden rounded-wobble shadow-shelf md:col-span-2 md:-rotate-1">
-          {latest?.items[1]?.primary_image_url && <Image src={mediaUrl(latest.items[1].primary_image_url)} alt={latest.items[1].name} width={520} height={520} className="h-auto w-full object-cover" />}
-        </div>
-        <div className="md:col-span-3">
-          <h2 className="text-2xl font-extrabold md:text-3xl">
-            از خاک تا لعاب، همه‌چیز در یک حیاط
-          </h2>
-          <p className="mt-4 max-w-lg leading-8 text-char-soft dark:text-ink-soft">
-            کارگاه ما از سه خریطه خاک رس سفید شروع شد. امروز همان خاک، بعد از
-            چرخ، قلم‌گیری، لعاب‌دستی و سی‌وساعت پخت دو مرحله‌ای، به میز خانه‌های
-            شما می‌رسد. اگر لبهٔ یک ماگ کمی کج است، آن کجی امضای دست ماست.
-          </p>
-        </div>
-      </section>
+      <CategorySection
+        title="دسته‌بندی‌های محبوب"
+        subtitle="محصولات ما در دسته‌بندی‌های متنوع"
+        categories={fallbackAllCategories}
+        limit={6}
+      />
+
+      <ArticleSection
+        title="مقالات و اخبار"
+        articles={fallbackAllArticles}
+        limit={4}
+      />
+
+      <FAQSection
+        title="سوالات رایج"
+        subtitle="پاسخ‌های سریع به سوال‌های شما"
+        faq_items={fallbackAllFaq}
+        limit={4}
+      />
 
       <NewsletterBand />
     </div>

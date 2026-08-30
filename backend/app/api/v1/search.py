@@ -20,17 +20,22 @@ async def instant_search(
     if not q:
         return {"query": "", "products": [], "categories": []}
 
-    like = f"%{q}%"
+    escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    like = f"%{escaped}%"
     products = session.exec(
         select(Product)
         .where(
             Product.is_active == True,  # noqa: E712
-            or_(Product.name.ilike(like), Product.short_description.ilike(like)),
+            or_(
+                Product.name.ilike(like, escape="\\"),
+                Product.short_description.ilike(like, escape="\\"),
+                Product.description.ilike(like, escape="\\"),
+            ),
         )
         .limit(limit)
     ).all()
     categories = session.exec(
-        select(Category).where(Category.name.ilike(like)).limit(4)  # type: ignore[arg-type]
+        select(Category).where(Category.name.ilike(like, escape="\\")).limit(4)  # type: ignore[arg-type]
     ).all()
 
     def prod_row(p: Product) -> dict:

@@ -1,54 +1,125 @@
 "use client";
 
 import Image from "next/image";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Gift } from "lucide-react";
+import { Gift, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast-provider";
 import { useCart } from "@/lib/cart";
-import { API_URL } from "@/lib/api";
+import { type ShippingMethod, mediaUrl } from "@/lib/api";
 import { faPrice } from "@/lib/format";
-import { mediaUrl } from "@/lib/api";
 
-const SHIPPING = 55000;
+const FALLBACK_SHIPPING = 55000;
 const GIFT_FEE = 30000;
 
 export default function CheckoutPage() {
-  const { lines, subtotal, clear } = useCart();
+  const { lines, subtotal, variantSelections } = useCart();
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState("");
   const [giftWrap, setGiftWrap] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    async function loadShipping() {
+      try {
+        const { apiFetch } = await import("@/lib/api-client");
+        const res = await apiFetch(`/shipping-methods`, { signal: controller.signal } as RequestInit);
+        if (!cancelled && res.ok) {
+          const data = (await res.json()) as ShippingMethod[];
+          const active = data.filter((m) => m.is_active);
+          setShippingMethods(active);
+          if (active.length > 0 && active[0]) setSelectedShippingId(active[0].id);
+        }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        /* fallback to empty -> use FALLBACK_SHIPPING */
+      }
+    }
+    void loadShipping();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
+  const [taxRate, setTaxRate] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    async function loadTax() {
+      try {
+        const { apiFetch } = await import("@/lib/api-client");
+        const res = await apiFetch(`/settings/tax_rate`, { signal: controller.signal } as RequestInit);
+        if (!cancelled && res.ok) {
+          const data = (await res.json()) as { value: unknown };
+          const v = typeof data.value === "number" ? data.value : typeof data.value === "string" ? parseFloat(data.value) : 0;
+          if (!Number.isNaN(v) && v >= 0 && v < 1) setTaxRate(v);
+          else if (!Number.isNaN(v) && v >= 1 && v < 100) setTaxRate(v / 100);
+        }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+      }
+    }
+    void loadTax();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
+  const selectedShipping = shippingMethods.find((m) => m.id === selectedShippingId) ?? null;
+  const shippingCost = (() => {
+    if (!selectedShipping) return FALLBACK_SHIPPING;
+    if (selectedShipping.free_over_amount !== null && subtotal >= Number(selectedShipping.free_over_amount)) return 0;
+    return Number(selectedShipping.cost);
+  })();
+  const taxable = Math.max(subtotal - discount, 0);
+  const taxAmount = Math.round(taxable * taxRate);
+
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
   async function applyCoupon() {
-    if (!coupon.trim()) return;
-    const res = await fetch(`${API_URL}/coupons/validate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: coupon, order_total: subtotal }),
-    });
-    const data = await res.json();
-    setDiscount(data.discount_amount ?? 0);
-    setCouponMsg(data.message ?? "");
-    toast(data.message ?? "", data.valid ? "success" : "error");
+    if (!coupon.trim() || applyingCoupon) return;
+    setApplyingCoupon(true);
+    try {
+      const { apiFetch } = await import("@/lib/api-client");
+      const res = await apiFetch(`/coupons/validate`, {
+        method: "POST",
+        body: JSON.stringify({ code: coupon, order_total: subtotal }),
+        _noDedup: true,
+        _noCache: true,
+      } as RequestInit);
+      const data = await res.json();
+      setDiscount(data.discount_amount ?? 0);
+      setCouponMsg(data.message ?? "");
+      toast(data.message ?? "", data.valid ? "success" : "error");
+    } catch (e) {
+      toast((e as Error).message || "خطا در اعتبارسنجی", "error");
+    } finally {
+      setApplyingCoupon(false);
+    }
   }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     const form = new FormData(e.currentTarget);
     try {
-      const res = await fetch(`${API_URL}/orders`, {
+      const { apiFetch } = await import("@/lib/api-client");
+      const res = await apiFetch(`/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: lines.map((l) => ({ product_id: l.productId, quantity: l.quantity })),
+          items: lines.map((l) => ({ product_id: l.productId, quantity: l.quantity, variant_id: l.variantId ?? null })),
           customer_name: form.get("customer_name"),
           phone: form.get("phone"),
           email: form.get("email") || null,
@@ -62,6 +133,8 @@ export default function CheckoutPage() {
           coupon_code: coupon.trim() || null,
           gift_wrap: giftWrap,
           gift_note: giftWrap ? form.get("gift_note") || null : null,
+          shipping_method_id: selectedShippingId,
+          variant_selections: Object.keys(variantSelections).length > 0 ? variantSelections : undefined,
         }),
       });
       const data = await res.json();
@@ -70,11 +143,25 @@ export default function CheckoutPage() {
         setSubmitting(false);
         return;
       }
+      // Persist order info for the confirmation page
       sessionStorage.setItem(
         "tinceram.last-order",
         JSON.stringify({ ...data, placedAt: Date.now() }),
       );
-      clear();
+      // C5 fix: do NOT permanently clear the cart before payment is confirmed.
+      // Keep the cart in localStorage so the user can retry after a failure or
+      // cancellation. Snapshot the pending cart for recovery if needed.
+      try {
+        sessionStorage.setItem("tinceram.pending-cart", JSON.stringify(lines));
+      } catch {
+        /* ignore quota errors */
+      }
+      // Redirect to the payment gateway when a payment_url is provided.
+      // Otherwise fall back to the confirmation page (e.g. for COD flows).
+      if (data.payment_url) {
+        window.location.href = data.payment_url;
+        return;
+      }
       router.push(`/order/confirmation?order=${data.order_number}`);
     } catch {
       toast("ارتباط با سرور برقرار نشد", "error");
@@ -93,7 +180,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const total = Math.max(subtotal - discount + SHIPPING + (giftWrap ? GIFT_FEE : 0), 0);
+  const total = Math.max(subtotal - discount + shippingCost + (giftWrap ? GIFT_FEE : 0) + taxAmount, 0);
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-6xl px-4 py-10 md:px-6">
@@ -128,8 +215,55 @@ export default function CheckoutPage() {
             </Field>
           </div>
 
+          {/* shipping method */}
+          {shippingMethods.length > 0 ? (
+            <div className="space-y-3">
+              <h3 className="flex items-center gap-2 font-bold">
+                <Truck size={18} className="text-lajvard" /> روش ارسال
+              </h3>
+              <div className="grid gap-2">
+                {shippingMethods.map((m) => {
+                  const cost = Number(m.cost);
+                  const freeOver = m.free_over_amount !== null ? Number(m.free_over_amount) : null;
+                  const isFree = freeOver !== null && subtotal >= freeOver;
+                  return (
+                    <label
+                      key={m.id}
+                      className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 transition ${selectedShippingId === m.id ? "border-lajvard bg-lajvard/10 dark:border-lajvard-soft dark:bg-lajvard-soft/10" : "border-char/15 bg-surface dark:border-white/15"}`}
+                    >
+                      <span className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="shipping_method"
+                          checked={selectedShippingId === m.id}
+                          onChange={() => setSelectedShippingId(m.id)}
+                          className="h-4 w-4 accent-[#31547A]"
+                        />
+                        <span>
+                          <span className="block text-sm font-medium">{m.name}</span>
+                          <span className="block text-xs text-char-soft dark:text-ink-soft">
+                            {m.estimated_days_min}–{m.estimated_days_max} روز کاری
+                            {freeOver !== null ? ` — رایگان بالای ${faPrice(freeOver)}` : ""}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="text-sm font-bold">{isFree ? "رایگان" : cost === 0 ? "رایگان" : faPrice(cost)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {selectedShipping &&
+                selectedShipping.free_over_amount !== null &&
+                subtotal >= Number(selectedShipping.free_over_amount) && (
+                  <p className="text-xs font-medium text-firouzeh">✓ ارسال رایگان برای این سفارش اعمال شد</p>
+                )}
+            </div>
+          ) : (
+            <p className="text-xs text-char-soft dark:text-ink-soft">هزینهٔ ارسال: {faPrice(FALLBACK_SHIPPING)} — پس از انتخاب روش ارسال به‌روز می‌شود</p>
+          )}
+
           {/* gift options */}
-          <div className="glaze-edge rounded-wobble bg-surface p-5 dark:bg-black/25">
+          <div className="glaze-edge rounded-wobble bg-surface p-5">
             <label className="flex cursor-pointer items-center gap-3 font-medium">
               <input
                 type="checkbox"
@@ -159,12 +293,12 @@ export default function CheckoutPage() {
 
         {/* summary */}
         <aside aria-labelledby="sum-h" className="lg:sticky lg:top-28 lg:self-start">
-          <div className="space-y-4 rounded-wobble bg-surface p-6 shadow-shelf dark:bg-black/25">
+          <div className="space-y-4 rounded-wobble bg-surface p-6 shadow-shelf">
             <h2 id="sum-h" className="font-extrabold">خلاصهٔ سفارش</h2>
             <ul className="max-h-56 space-y-3 overflow-auto pl-1">
               {lines.map((l) => (
-                <li key={l.productId} className="flex items-center gap-3 text-sm">
-                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slip dark:bg-black/30">
+                <li key={`${l.productId}-${l.variantId ?? ""}`} className="flex items-center gap-3 text-sm">
+                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slip dark:bg-surface">
                     {l.imageUrl && (
                       <Image src={mediaUrl(l.imageUrl)} alt="" fill sizes="48px" className="object-cover" />
                     )}
@@ -189,8 +323,8 @@ export default function CheckoutPage() {
                   placeholder="مثلاً WELCOME15"
                   dir="ltr"
                 />
-                <Button type="button" variant="secondary" onClick={applyCoupon}>
-                  اعمال
+                <Button type="button" variant="secondary" onClick={applyCoupon} disabled={applyingCoupon}>
+                  {applyingCoupon ? "..." : "اعمال"}
                 </Button>
               </div>
               {couponMsg && <p className="mt-2 text-xs text-char-soft dark:text-ink-soft">{couponMsg}</p>}
@@ -201,7 +335,13 @@ export default function CheckoutPage() {
               {discount > 0 && (
                 <div className="flex justify-between text-firouzeh"><dt>تخفیف</dt><dd>−{faPrice(discount)}</dd></div>
               )}
-              <div className="flex justify-between"><dt>ارسال</dt><dd>{faPrice(SHIPPING)}</dd></div>
+              {taxAmount > 0 && (
+                <div className="flex justify-between"><dt>مالیات ({Math.round(taxRate * 100)}٪)</dt><dd>{faPrice(taxAmount)}</dd></div>
+              )}
+              <div className="flex justify-between">
+                <dt>ارسال{selectedShipping ? ` (${selectedShipping.name})` : ""}</dt>
+                <dd>{shippingCost === 0 ? "رایگان" : faPrice(shippingCost)}</dd>
+              </div>
               {giftWrap && (
                 <div className="flex justify-between"><dt>بسته‌بندی هدیه</dt><dd>{faPrice(GIFT_FEE)}</dd></div>
               )}
@@ -216,4 +356,3 @@ export default function CheckoutPage() {
     </form>
   );
 }
-

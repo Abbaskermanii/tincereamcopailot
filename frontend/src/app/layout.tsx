@@ -3,7 +3,9 @@ import { Vazirmatn } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart";
+import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/toast-provider";
+import { SettingsProvider } from "@/lib/settings-context";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { ServiceWorkerRegistrar } from "@/components/layout/service-worker-registrar";
@@ -34,20 +36,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body className={`${vazir.variable} font-vazir antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-          <CartProvider>
-            <ToastProvider>
-              <a
-                href="#main"
-                className="sr-only focus:not-sr-only focus:absolute focus:right-4 focus:top-4 focus:z-[80] focus:rounded-xl focus:bg-lajvard focus:px-4 focus:py-2 focus:text-white"
-              >
-                پرش به محتوای اصلی
-              </a>
-              <Header />
-              <main id="main">{children}</main>
-              <Footer />
-              <ServiceWorkerRegistrar />
-            </ToastProvider>
-          </CartProvider>
+          <SettingsProvider>
+            <AuthProvider>
+              <CartProvider>
+                <ToastProvider>
+                  <a
+                    href="#main"
+                    className="sr-only focus:not-sr-only focus:absolute focus:right-4 focus:top-4 focus:z-[80] focus:rounded-xl focus:bg-lajvard focus:px-4 focus:py-2 focus:text-white"
+                  >
+                    پرش به محتوای اصلی
+                  </a>
+                  <Header />
+                  <main id="main">{children}</main>
+                  <Footer />
+                  <ServiceWorkerRegistrar />
+                </ToastProvider>
+              </CartProvider>
+            </AuthProvider>
+          </SettingsProvider>
         </ThemeProvider>
       </body>
     </html>

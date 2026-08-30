@@ -3,7 +3,7 @@ from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
 from app.db.session import get_session
-from app.models import Category, Product, ProductImage
+from app.models import Brand, Category, Product, ProductImage, ProductVariant
 from app.schemas.store import (
     CategoryDetail,
     CategoryNode,
@@ -30,9 +30,10 @@ def _list_item(p: Product) -> dict:
     }
 
 
-def _detail(p: Product) -> dict:
+def _detail(p: Product, variants: list[ProductVariant] | None = None) -> dict:
     base = _list_item(p)
     cat = p.category
+    var_list = variants if variants is not None else []
     return {
         **base,
         "description": p.description,
@@ -55,6 +56,19 @@ def _detail(p: Product) -> dict:
                 "is_primary": i.is_primary,
             }
             for i in sorted(p.images, key=lambda x: x.sort_order)
+        ],
+        "variants": [
+            {
+                "id": v.id,
+                "name": v.name,
+                "sku": v.sku,
+                "image_url": v.image_url,
+                "price_delta": float(v.price_delta),
+                "absolute_price": float(v.absolute_price) if v.absolute_price is not None else None,
+                "stock_qty": v.stock_qty,
+                "is_active": v.is_active,
+            }
+            for v in var_list
         ],
     }
 
@@ -108,6 +122,7 @@ async def list_products(
     max_price: float | None = Query(default=None, ge=0),
     sort: str = Query(default="newest"),
     in_stock_only: bool = False,
+    brand: str | None = None,
     session: Session = Depends(get_session),
 ) -> ProductPage:
     sort_col = SORTS.get(sort, SORTS["newest"])
@@ -122,6 +137,7 @@ async def list_products(
         max_price=max_price,
         sort=sort,
         stock=in_stock_only,
+        brand=brand or "",
     )
     cached = cache_get_json(cache_key)
     if cached is not None:
@@ -129,8 +145,8 @@ async def list_products(
 
     category_ids: list[str] | None = None
     if category:
-        cache_key = f"catids:{category}"
-        category_ids = cache_get_json(cache_key)
+        cat_cache_key = f"catids:{category}"
+        category_ids = cache_get_json(cat_cache_key)
         if category_ids is None:
             cat = session.exec(select(Category).where(Category.slug == category)).first()  # type: ignore[arg-type]
             if cat:
@@ -140,16 +156,29 @@ async def list_products(
                 category_ids = [cat.id] + list(children)
             else:
                 category_ids = []
-            cache_set_json(cache_key, category_ids, ttl_seconds=300)
+            cache_set_json(cat_cache_key, category_ids, ttl_seconds=300)
 
     filters = [Product.is_active == True]  # noqa: E712
+    if brand:
+        brand_row = session.exec(select(Brand).where(Brand.slug == brand)).first()  # type: ignore[arg-type]
+        if not brand_row:
+            return ProductPage(items=[], total=0, page=page, page_size=page_size, pages=0)
+        filters.append(Product.brand_id == brand_row.id)
     if category_ids is not None:
         if not category_ids:
             return ProductPage(items=[], total=0, page=page, page_size=page_size, pages=0)
         filters.append(Product.category_id.in_(category_ids))
     if search:
-        like = f"%{search}%"
-        filters.append(or_(Product.name.ilike(like), Product.short_description.ilike(like)))
+        # Escape LIKE wildcards so user input "%" or "_" does not become a wildcard (H3/M1)
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{escaped}%"
+        filters.append(
+            or_(
+                Product.name.ilike(like, escape="\\"),
+                Product.short_description.ilike(like, escape="\\"),
+                Product.description.ilike(like, escape="\\"),
+            )
+        )
     if min_price is not None:
         filters.append(Product.price >= min_price)
     if max_price is not None:
@@ -179,7 +208,17 @@ async def product_detail(slug: str, session: Session = Depends(get_session)) -> 
     ).first()
     if not p:
         raise HTTPException(404, "محصول یافت نشد.")
-    return ProductDetail(**_detail(p))
+    variants = session.exec(
+        select(ProductVariant).where(ProductVariant.product_id == p.id, ProductVariant.is_active == True).order_by(ProductVariant.sort_order)  # type: ignore[arg-type]
+    ).all()
+    return ProductDetail(**_detail(p, variants))
+
+
+@router.get("/brands", response_model=list[dict])
+async def list_brands_public(session: Session = Depends(get_session)) -> list[dict]:
+    """Public active brands for storefront filters (no auth required)."""
+    rows = session.exec(select(Brand).where(Brand.is_active == True).order_by(Brand.name)).all()  # type: ignore[arg-type]
+    return [{"id": b.id, "name": b.name, "slug": b.slug, "logo_url": b.logo_url} for b in rows]
 
 
 # keep images listing reachable (used by admin preview tooling)

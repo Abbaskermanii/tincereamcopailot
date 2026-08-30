@@ -42,6 +42,28 @@ export interface ProductListItem {
   primary_image_url: string | null;
 }
 
+export interface ProductVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price_delta: number;
+  absolute_price: number | null;
+  stock_qty: number;
+  is_active: boolean;
+  image_url?: string;
+}
+
+export interface ShippingMethod {
+  id: string;
+  name: string;
+  code: string;
+  cost: number;
+  free_over_amount: number | null;
+  estimated_days_min: number;
+  estimated_days_max: number;
+  is_active: boolean;
+}
+
 export interface Category {
   id?: string;
   name: string;
@@ -51,19 +73,32 @@ export interface Category {
   children?: Category[];
 }
 
-async function get<T>(path: string, revalidate = 120): Promise<T | null> {
+import { cache } from "react";
+
+// dedup + cache for server fetches - React cache ensures same request in same render is deduped
+const cachedFetch = cache(async <T>(path: string, revalidate: number): Promise<T | null> => {
   try {
+    const tag = (path.split("?")[0] ?? path).split("/").filter(Boolean).pop() || "api";
     const res = await fetch(`${baseUrl()}${path}`, {
-      next: { revalidate },
+      next: { revalidate, tags: [tag] },
     });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch {
     return null;
   }
+});
+
+async function get<T>(path: string, revalidate = 120): Promise<T | null> {
+  return cachedFetch<T>(path, revalidate);
 }
 
 export async function apiGet<T>(path: string, revalidate = 120) {
+  return get<T>(path, revalidate);
+}
+
+// For stock-sensitive data, use shorter revalidate
+export async function getWithFreshness<T>(path: string, revalidate = 30): Promise<T | null> {
   return get<T>(path, revalidate);
 }
 
@@ -95,9 +130,38 @@ export const api = {
         category_slug: string | null;
         discount_percent: number;
         images: ProductImage[];
+        variants: ProductVariant[];
       }
     >(`/products/${slug}`),
   articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string }>>("/articles", 180),
   article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string }>(`/articles/${slug}`, 300),
-  carousels: () => get<Array<{ id: string; title?: string; image_url: string; link_url?: string; sort_order: number }>>("/carousels", 120),
+  carousels: () =>
+    get<Array<{ id: string; title?: string; subtitle?: string | null; image_url: string; link_url?: string | null; sort_order: number; is_active?: boolean }>>(
+      "/carousels",
+      120
+    ),
+  shippingMethods: () => get<ShippingMethod[]>("/shipping-methods", 120),
+  faq: () =>
+    get<Array<{ id: string; question: string; answer: string; category: string; sort_order: number; is_active: boolean }>>(
+      "/faq",
+      120
+    ),
+  homepage: () =>
+    get<{
+      sections: Array<{
+        id: string;
+        kind: string;
+        title: string;
+        subtitle: string | null;
+        sort_order: number;
+        source?: string | null;
+        products?: ProductListItem[];
+        slides?: Array<{ id: string; title: string; subtitle: string | null; image_url: string; link_url: string | null }>;
+        categories?: Array<{ id: string; name: string; slug: string; image_url: string | null; product_count: number }>;
+        articles?: Array<{ id: string; title: string; slug: string; excerpt: string; published_at: string }>;
+        faq?: Array<{ id: string; question: string; answer: string }>;
+      }>;
+      generated_at: string;
+    }>("/homepage", 60),
+  brands: () => get<Array<{ id: string; name: string; slug: string; logo_url: string | null; is_active: boolean }>>("/brands", 120),
 };
