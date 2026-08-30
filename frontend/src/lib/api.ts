@@ -2,10 +2,11 @@ export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, "");
 export function mediaUrl(path: string | null | undefined): string {
   if (!path) return "";
   if (/^https?:\/\//.test(path)) return path;
-  return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
 }
 /** Server-side fetches go through the docker network when available. */
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL;
