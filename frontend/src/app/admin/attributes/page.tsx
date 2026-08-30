@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ConfirmDialog, Field, FormActions, Modal, PageHeader, TextInput, Toggle } from "@/components/admin/kit";
+import { Field, FormActions, Modal, PageHeader, TextInput } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
 import { mediaUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
+
 
 interface AttributeValue {
   id: string;

@@ -349,7 +349,7 @@ function ProductMedia({ productId }: { productId: string }) {
 
 function ProductAttributes({ productId }: { productId: string }) {
   const { data: attrs, reload } = useAdminResource<Array<{ product_attribute_id: string; attribute: { id: string; name: string; slug: string }; values: Array<{ id: string; value: string; slug: string; swatch_image_url: string | null }> }>>(`/admin/products/${productId}/attributes`);
-  const { data: globalAttrs, reload: reloadGlobal } = useAdminResource<Array<{ id: string; name: string; slug: string; values: Array<{ id: string; value: string; slug: string; swatch_image_url: string | null }> }>>("/admin/attributes");
+  const { data: globalAttrs } = useAdminResource<Array<{ id: string; name: string; slug: string; values: Array<{ id: string; value: string; slug: string; swatch_image_url: string | null }> }>>("/admin/attributes");
   const { mutate, busy } = useAdminMutation();
   const { toast } = useToast();
   const [selectedAttrId, setSelectedAttrId] = useState("");

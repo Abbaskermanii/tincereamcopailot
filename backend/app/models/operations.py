@@ -1,5 +1,8 @@
 from datetime import datetime
+
+from sqlalchemy import Index
 from sqlmodel import Field
+
 from app.models.base import UUIDMixin, TimestampMixin
 
 class RelatedProduct(UUIDMixin, TimestampMixin, table=True):
@@ -25,6 +28,24 @@ class Article(UUIDMixin, TimestampMixin, table=True):
     published_at: datetime | None = None
     meta_title: str | None = None
     meta_description: str | None = None
+    view_count: int = Field(default=0, index=True)
+    is_featured: bool = Field(default=False, index=True)
+    reading_time_minutes: int = Field(default=0)
+
+
+class ArticleTag(UUIDMixin, TimestampMixin, table=True):
+    __tablename__ = "article_tags"
+    name: str = Field(max_length=64, index=True)
+    slug: str = Field(max_length=64, unique=True, index=True)
+
+
+class ArticleTagLink(UUIDMixin, table=True):
+    __tablename__ = "article_tag_links"
+    __table_args__ = (
+        Index("uq_article_tag", "article_id", "tag_id", unique=True),
+    )
+    article_id: str = Field(foreign_key="articles.id", index=True)
+    tag_id: str = Field(foreign_key="article_tags.id", index=True)
 
 class Carousel(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "carousels"

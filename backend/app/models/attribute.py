@@ -8,9 +8,6 @@ class Attribute(UUIDMixin, TimestampMixin, table=True):
     """Global attribute definition e.g. 'رنگ' or 'طرح' — reusable across products."""
 
     __tablename__ = "attributes"
-    __table_args__ = (
-        Index("ix_attributes_slug", "slug", unique=True),
-    )
 
     name: str = Field(max_length=128, index=True)
     slug: str = Field(max_length=128, unique=True, index=True)
@@ -39,7 +36,6 @@ class ProductAttribute(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "product_attributes"
     __table_args__ = (
         Index("uq_product_attribute", "product_id", "attribute_id", unique=True),
-        Index("ix_product_attributes_product_id", "product_id"),
     )
 
     product_id: str = Field(foreign_key="products.id", index=True)

@@ -33,7 +33,7 @@ from app.models.identity import (
     WishlistItem,
 )
 from app.models.operations import (
-    ActivityLog, Article, ArticleCategory, Carousel,
+    ActivityLog, Article, ArticleCategory, ArticleTag, ArticleTagLink, Carousel,
     Notification, RelatedProduct, Setting,
 )
 from app.models.variant import ProductVariant
@@ -53,6 +53,6 @@ __all__ = [
     "Attribute", "AttributeValue", "ProductAttribute", "ProductVariantAttributeValue",
     "Address", "OtpCode", "OtpPurpose", "PasswordResetToken",
     "RefreshToken", "Role", "User", "WishlistItem",
-    "ActivityLog", "Article", "ArticleCategory", "Carousel",
+    "ActivityLog", "Article", "ArticleCategory", "ArticleTag", "ArticleTagLink", "Carousel",
     "Notification", "RelatedProduct", "Setting",
 ]

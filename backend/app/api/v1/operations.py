@@ -1,4 +1,5 @@
 import json
+import re
 import secrets
 from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query
@@ -9,6 +10,43 @@ from app.models import *
 from app.api.v1.auth import admin_user, current_user
 from app.services.homepage import invalidate_home
 from app.services.storage import put_image
+
+def _reading_time_minutes(body: str) -> int:
+    if not body:
+        return 0
+    # strip html tags
+    text = re.sub(r"<[^>]+>", " ", body)
+    words = len(re.findall(r"\w+", text, flags=re.UNICODE))
+    # Persian reading ~ 200-250 wpm, use 200
+    return max(1, (words + 199) // 200) if words else 0
+
+
+def _get_article_tags(session: Session, article_id: str) -> list[dict]:
+    links = session.exec(select(ArticleTagLink).where(ArticleTagLink.article_id == article_id)).all()
+    if not links:
+        return []
+    tag_ids = [l.tag_id for l in links]
+    tags = session.exec(select(ArticleTag).where(ArticleTag.id.in_(tag_ids))).all() if tag_ids else []
+    return [{"id": t.id, "name": t.name, "slug": t.slug} for t in tags]
+
+
+def _sync_article_tags(session: Session, article_id: str, tag_slugs: list[str] | None):
+    if tag_slugs is None:
+        return
+    # clear existing
+    for link in session.exec(select(ArticleTagLink).where(ArticleTagLink.article_id == article_id)).all():
+        session.delete(link)
+    for slug in tag_slugs:
+        slug = slug.strip().lower()
+        if not slug:
+            continue
+        tag = session.exec(select(ArticleTag).where(ArticleTag.slug == slug)).first()
+        if not tag:
+            # create on fly
+            tag = ArticleTag(name=slug, slug=slug)
+            session.add(tag)
+            session.flush()
+        session.add(ArticleTagLink(article_id=article_id, tag_id=tag.id))
 
 admin = APIRouter(prefix="/admin")
 public = APIRouter()
@@ -217,6 +255,10 @@ def public_related(product_id: str, s: Session = Depends(get_session)):
 
 class ArticleIn(BaseModel):
     title: str; slug: str; body: str; excerpt: str = ""; cover_url: str | None = None; category_id: str | None = None; is_published: bool = False
+    is_featured: bool = False
+    tag_slugs: list[str] = []
+    meta_title: str | None = None
+    meta_description: str | None = None
 
 
 @admin.post("/article-categories", status_code=201)
@@ -264,13 +306,71 @@ def delete_article_category(category_id: str, _: User = Depends(admin_user), s: 
 def admin_articles(_: User = Depends(admin_user), s: Session = Depends(get_session)):
     rows = s.exec(select(Article).order_by(Article.created_at.desc())).all()
     cats = {c.id: c.name for c in s.exec(select(ArticleCategory)).all()}
+    # cache author names to avoid N+1
+    author_ids = {a.author_id for a in rows if a.author_id}
+    authors = {u.id: u.full_name for u in session_exec_ids(s, User, author_ids)} if author_ids else {}
     return [
         {
-            **{k: getattr(a, k) for k in ("id", "title", "slug", "excerpt", "cover_url", "category_id", "is_published", "published_at", "created_at")},
+            **{k: getattr(a, k) for k in ("id", "title", "slug", "excerpt", "cover_url", "category_id", "is_published", "is_featured", "published_at", "created_at", "view_count", "reading_time_minutes", "updated_at")},
             "category_name": cats.get(a.category_id) if a.category_id else None,
+            "author_name": authors.get(a.author_id) if a.author_id else None,
+            "tags": _get_article_tags(s, a.id),
         }
         for a in rows
     ]
+
+
+def session_exec_ids(session: Session, model, ids: set[str]):
+    if not ids:
+        return []
+    return session.exec(select(model).where(model.id.in_(ids))).all()  # type: ignore[arg-type]
+
+
+# Article tags admin
+@admin.get("/article-tags")
+def admin_article_tags(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+    return s.exec(select(ArticleTag).order_by(ArticleTag.name)).all()
+
+
+@admin.post("/article-tags", status_code=201)
+def create_article_tag(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+    slug = data.get("slug") or _slugify_local(data.get("name",""))
+    if s.exec(select(ArticleTag).where(ArticleTag.slug == slug)).first():
+        raise HTTPException(409, "slug تگ تکراری است")
+    row = ArticleTag(name=data["name"], slug=slug)
+    s.add(row); s.commit(); s.refresh(row); return row
+
+
+def _slugify_local(value: str) -> str:
+    import re as _re
+    s = value.strip().lower()
+    s = _re.sub(r"[\s\u200c]+", "-", s)
+    s = _re.sub(r"[^\w\-]+", "", s, flags=_re.UNICODE)
+    s = _re.sub(r"-+", "-", s)
+    return s.strip("-") or "tag"
+
+
+@admin.patch("/article-tags/{tag_id}")
+def update_article_tag(tag_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+    row = s.get(ArticleTag, tag_id)
+    if not row:
+        raise HTTPException(404, "تگ یافت نشد")
+    if "slug" in data and s.exec(select(ArticleTag).where(ArticleTag.slug == data["slug"], ArticleTag.id != tag_id)).first():
+        raise HTTPException(409, "slug تکراری است")
+    for k in ("name", "slug"):
+        if k in data:
+            setattr(row, k, data[k])
+    s.add(row); s.commit(); return row
+
+
+@admin.delete("/article-tags/{tag_id}")
+def delete_article_tag(tag_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+    row = s.get(ArticleTag, tag_id)
+    if not row:
+        raise HTTPException(404, "تگ یافت نشد")
+    if s.exec(select(ArticleTagLink).where(ArticleTagLink.tag_id == tag_id)).first():
+        raise HTTPException(409, "این تگ به مقاله‌ای متصل است")
+    s.delete(row); s.commit(); return {"ok": True}
 
 def _sanitize_html(raw: str) -> str:
     """Allowlist-based HTML sanitization for rich-text (article/product body).
@@ -318,14 +418,25 @@ def _sanitize_html(raw: str) -> str:
 def create_article(p: ArticleIn, u: User = Depends(admin_user), s: Session = Depends(get_session)):
     if s.exec(select(Article).where(Article.slug == p.slug)).first():
         raise HTTPException(409, "slug تکراری است")
-    data = p.model_dump()
+    data = p.model_dump(exclude={"tag_slugs"})
     data["body"] = _sanitize_html(data["body"])
     data["excerpt"] = _sanitize_html(data["excerpt"])
-    row = Article(**data, author_id=u.id)
+    data["reading_time_minutes"] = _reading_time_minutes(data["body"])
+    # handle featured/reading time defaults
+    row = Article(**{k: v for k, v in data.items() if k in Article.model_fields}, author_id=u.id)  # type: ignore[arg-type]
+    # ensure is_featured etc from payload
+    row.is_featured = p.is_featured  # type: ignore[attr-defined]
+    row.reading_time_minutes = _reading_time_minutes(p.body)  # type: ignore[attr-defined]
     s.add(row)
     s.commit()
     s.refresh(row)
-    return row
+    _sync_article_tags(s, row.id, p.tag_slugs)
+    s.commit()
+    invalidate_home()
+    # return with tags
+    out = row.model_dump()
+    out["tags"] = _get_article_tags(s, row.id)
+    return out
 
 
 @admin.patch("/articles/{article_id}")
@@ -335,18 +446,24 @@ def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s
         raise HTTPException(404, "مقاله یافت نشد")
     if "slug" in data and s.exec(select(Article).where(Article.slug == data["slug"], Article.id != article_id)).first():
         raise HTTPException(409, "slug تکراری است")
-    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "published_at"}
+    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "is_featured", "published_at", "meta_title", "meta_description"}
     for key, value in data.items():
         if key in allowed:
             if key in ("body", "excerpt") and isinstance(value, str):
                 value = _sanitize_html(value)
             setattr(row, key, value)
+    if "body" in data and isinstance(data["body"], str):
+        row.reading_time_minutes = _reading_time_minutes(data["body"])  # type: ignore[attr-defined]
+    if "tag_slugs" in data and isinstance(data["tag_slugs"], list):
+        _sync_article_tags(s, row.id, data["tag_slugs"])
     if data.get("is_published") and row.published_at is None:
         row.published_at = datetime.now(UTC)
     s.add(row)
     s.commit()
     invalidate_home()
-    return row
+    out = row.model_dump()
+    out["tags"] = _get_article_tags(s, row.id)
+    return out
 
 
 @admin.delete("/articles/{article_id}")
@@ -403,30 +520,102 @@ def update_order_status(order_id: str, data: dict, _: User = Depends(admin_user)
     return row
 
 @public.get("/articles")
-def articles(s: Session = Depends(get_session), offset: int=0, limit: int=Query(20,le=100)):
-    rows = s.exec(select(Article).where(Article.is_published==True).order_by(Article.published_at.desc()).offset(offset).limit(limit)).all() # noqa
+def articles(
+    s: Session = Depends(get_session),
+    offset: int = 0,
+    limit: int = Query(20, le=100),
+    category: str | None = None,
+    tag: str | None = None,
+    search: str | None = None,
+    featured: bool | None = None,
+):
+    filters = [Article.is_published == True]  # noqa: E712
+    if category:
+        # category may be slug or id
+        cat = s.exec(select(ArticleCategory).where(ArticleCategory.slug == category)).first()
+        if cat:
+            filters.append(Article.category_id == cat.id)
+        else:
+            filters.append(Article.category_id == category)
+    if tag:
+        t = s.exec(select(ArticleTag).where(ArticleTag.slug == tag)).first()
+        if t:
+            ids = [l.article_id for l in s.exec(select(ArticleTagLink).where(ArticleTagLink.tag_id == t.id)).all()]
+            if ids:
+                filters.append(Article.id.in_(ids))  # type: ignore[arg-type]
+            else:
+                return []
+        else:
+            return []
+    if search:
+        like = f"%{search}%"
+        from sqlalchemy import or_ as _or
+        filters.append(_or(Article.title.ilike(like), Article.excerpt.ilike(like), Article.body.ilike(like)))
+    if featured is not None:
+        filters.append(Article.is_featured == featured)
+    # featured first then newest
+    rows = s.exec(select(Article).where(*filters).order_by(Article.is_featured.desc(), Article.published_at.desc()).offset(offset).limit(limit)).all()  # type: ignore[arg-type]
+    # batch fetch categories/authors/tags
+    cat_map = {c.id: c.name for c in s.exec(select(ArticleCategory)).all()}
+    author_ids = {a.author_id for a in rows if a.author_id}
+    authors = {u.id: u for u in s.exec(select(User).where(User.id.in_(list(author_ids)))).all()} if author_ids else {}
     out = []
     for a in rows:
-        author = s.get(User, a.author_id) if a.author_id else None
+        author = authors.get(a.author_id) if a.author_id else None
         d = a.model_dump()
         d["author_name"] = author.full_name if author else None
-        d["author_avatar_url"] = author.avatar_url if author and getattr(author, "avatar_url", None) else None
+        d["author_avatar_url"] = getattr(author, "avatar_url", None) if author else None
+        d["category_name"] = cat_map.get(a.category_id) if a.category_id else None
+        d["tags"] = _get_article_tags(s, a.id)
         out.append(d)
     return out
 
+
 @public.get("/articles/{slug}")
 def article(slug: str, s: Session = Depends(get_session)):
-    row=s.exec(select(Article).where(Article.slug==slug, Article.is_published==True)).first() # noqa
-    if not row: raise HTTPException(404,"مقاله یافت نشد")
+    row = s.exec(select(Article).where(Article.slug == slug, Article.is_published == True)).first()  # noqa
+    if not row:
+        raise HTTPException(404, "مقاله یافت نشد")
+    # increment view count
+    try:
+        row.view_count = (row.view_count or 0) + 1  # type: ignore[attr-defined]
+        s.add(row)
+        s.commit()
+        s.refresh(row)
+    except Exception:
+        pass
     author = s.get(User, row.author_id) if row.author_id else None
     d = row.model_dump()
     d["author_name"] = author.full_name if author else None
-    d["author_avatar_url"] = author.avatar_url if author and getattr(author, "avatar_url", None) else None
-    # also include category name for convenience
+    d["author_avatar_url"] = getattr(author, "avatar_url", None) if author else None
     if row.category_id:
         cat = s.get(ArticleCategory, row.category_id)
         d["category_name"] = cat.name if cat else None
+        # related articles (same category, exclude self)
+        try:
+            related = s.exec(
+                select(Article).where(Article.category_id == row.category_id, Article.is_published == True, Article.id != row.id).order_by(Article.published_at.desc()).limit(4)  # type: ignore[arg-type]
+            ).all()
+            d["related"] = [
+                {"id": r.id, "title": r.title, "slug": r.slug, "excerpt": r.excerpt, "cover_url": r.cover_url, "published_at": r.published_at}
+                for r in related
+            ]
+        except Exception:
+            d["related"] = []
+    else:
+        d["related"] = []
+    d["tags"] = _get_article_tags(s, row.id)
     return d
+
+
+@public.get("/article-tags")
+def public_article_tags(s: Session = Depends(get_session)):
+    return s.exec(select(ArticleTag).order_by(ArticleTag.name)).all()
+
+
+@public.get("/article-categories")
+def public_article_categories(s: Session = Depends(get_session)):
+    return s.exec(select(ArticleCategory).order_by(ArticleCategory.name)).all()
 
 @admin.post("/settings")
 def set_setting(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):

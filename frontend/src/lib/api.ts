@@ -155,8 +155,37 @@ export const api = {
         attributes: Attribute[];
       }
     >(`/products/${slug}`),
-  articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string }>>("/articles", 180),
-  article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string }>(`/articles/${slug}`, 300),
+  articles: (params?: Record<string, string | number | boolean | undefined>) => {
+    const qs = new URLSearchParams();
+    if (params) for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") qs.set(k, String(v));
+    const path = qs.toString() ? `/articles?${qs}` : "/articles";
+    return get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string; updated_at?: string; cover_url?: string | null; cover_image_url?: string | null; category_id?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; view_count?: number; reading_time_minutes?: number; is_featured?: boolean; meta_title?: string | null; meta_description?: string | null; tags?: Array<{ id: string; name: string; slug: string }> }>>(path, 180);
+  },
+  article: (slug: string) =>
+    get<{
+      id: string;
+      title: string;
+      slug: string;
+      excerpt?: string;
+      body: string;
+      published_at?: string;
+      updated_at?: string;
+      cover_url?: string | null;
+      cover_image_url?: string | null;
+      category_id?: string | null;
+      category_name?: string | null;
+      author_name?: string | null;
+      author_avatar_url?: string | null;
+      view_count?: number;
+      reading_time_minutes?: number;
+      is_featured?: boolean;
+      meta_title?: string | null;
+      meta_description?: string | null;
+      tags?: Array<{ id: string; name: string; slug: string }>;
+      related?: Array<{ id: string; title: string; slug: string; excerpt?: string; cover_url?: string | null; published_at?: string }>;
+    }>(`/articles/${slug}`, 30),
+  articleCategories: () => get<Array<{ id: string; name: string; slug: string }>>("/article-categories", 300),
+  articleTags: () => get<Array<{ id: string; name: string; slug: string }>>("/article-tags", 300),
   carousels: () =>
     get<Array<{ id: string; title?: string; subtitle?: string | null; image_url: string; link_url?: string | null; sort_order: number; is_active?: boolean }>>(
       "/carousels",

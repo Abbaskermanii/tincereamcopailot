@@ -29,6 +29,9 @@ const KIND_LABELS: Record<string, string> = {
   categories: "کارت دسته‌بندی‌ها",
   articles: "مقالات وبلاگ",
   faq: "سوالات رایج",
+  brand_story: "داستان برند",
+  testimonials: "نظرات مشتریان",
+  featured_category_spotlight: "دسته‌های ویژه (بنر بزرگ)",
 };
 
 const SOURCE_LABELS: Record<string, string> = {

@@ -178,7 +178,7 @@ export function ProductView({ product }: { product: Product }) {
   const finalPrice = hasAttributes ? displayPrice : legacyVariant ? legacyEffectivePrice : product.price;
   const finalStock = hasAttributes ? displayStock : legacyVariant ? legacyVariant.stock_qty : product.stock_qty;
   const finalSku = hasAttributes ? displaySku : legacyVariant ? legacyVariant.sku || product.sku : product.sku;
-  const finalVariantForCart = hasAttributes ? selectedVariant : legacyVariant;
+
 
   return (
     <>

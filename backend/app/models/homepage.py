@@ -16,6 +16,9 @@ class HomepageSectionKind(str, enum.Enum):
     categories = "categories"  # category cards grid
     articles = "articles"      # latest article teasers
     faq = "faq"                # FAQ accordion
+    brand_story = "brand_story"  # داستان برند / فلسفه دست‌ساز
+    testimonials = "testimonials"  # نظرات مشتریان
+    featured_category_spotlight = "featured_category_spotlight"  # بنر بزرگ برای هر دسته اصلی
 
 
 class ProductSource(str, enum.Enum):
