@@ -161,6 +161,13 @@ class OrderCreatedOut(OrderOut):
     payment_url: str
 
 
+class OrderStatusEventOut(BaseModel):
+    """One entry of an order's status history (sourced from OrderStatusHistory)."""
+
+    status: str
+    at: datetime
+
+
 class OrderStatusOut(BaseModel):
     order_number: str
     status: OrderStatus
@@ -175,6 +182,8 @@ class OrderStatusOut(BaseModel):
     carrier: str | None = None
     shipping_method_name: str | None = None
     items: list[OrderItemOut] = []
+    # backward-compatible addition: full status timeline for the tracking page
+    history: list[OrderStatusEventOut] = []
 
 
 # ---------- Coupons ----------

@@ -398,7 +398,7 @@ function ProductAttributes({ productId }: { productId: string }) {
                       <label key={v.id} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm cursor-pointer", checked ? "border-lajvard bg-lajvard/10 text-lajvard dark:border-lajvard-soft" : "border-char/15 dark:border-white/15")}>
                         <input type="checkbox" checked={checked} onChange={(e) => setSelectedValueIds((prev) => ({ ...prev, [v.id]: e.target.checked }))} className="h-4 w-4" />
                         {v.value}
-                        {v.swatch_image_url && <span className="h-5 w-5 overflow-hidden rounded-full border"><img src={mediaUrl(v.swatch_image_url)} alt={v.value} className="h-full w-full object-cover" /></span>}
+                        {v.swatch_image_url && <span className="h-5 w-5 overflow-hidden rounded-full border"><Image src={mediaUrl(v.swatch_image_url)} alt={v.value} width={20} height={20} unoptimized className="h-full w-full object-cover" /></span>}
                       </label>
                     );
                   })}

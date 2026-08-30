@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 from app.db.session import get_session
 from app.models import *
-from app.api.v1.auth import admin_user, current_user
+from app.api.v1.deps import admin_user, current_user
+from app.core.permissions import require_permission
 from app.services.homepage import invalidate_home
 from app.services.storage import put_image
 
@@ -53,7 +54,7 @@ public = APIRouter()
 
 
 @admin.post("/categories", status_code=201)
-def create_category(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_category(data: dict, _: User = Depends(require_permission("categories")), s: Session = Depends(get_session)):
     if s.exec(select(Category).where(Category.slug == data["slug"])).first():
         raise HTTPException(409, "slug تکراری است")
     if data.get("parent_id") and not s.get(Category, data["parent_id"]):
@@ -63,12 +64,12 @@ def create_category(data: dict, _: User = Depends(admin_user), s: Session = Depe
 
 
 @admin.get("/categories")
-def admin_categories(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def admin_categories(_: User = Depends(require_permission("categories")), s: Session = Depends(get_session)):
     return s.exec(select(Category).order_by(Category.name)).all()
 
 
 @admin.patch("/categories/{category_id}")
-def update_category(category_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_category(category_id: str, data: dict, _: User = Depends(require_permission("categories")), s: Session = Depends(get_session)):
     row = s.get(Category, category_id)
     if not row: raise HTTPException(404, "دسته یافت نشد")
     if data.get("parent_id") == category_id: raise HTTPException(400, "چرخه دسته‌بندی مجاز نیست")
@@ -78,7 +79,7 @@ def update_category(category_id: str, data: dict, _: User = Depends(admin_user),
 
 
 @admin.delete("/categories/{category_id}")
-def delete_category(category_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_category(category_id: str, _: User = Depends(require_permission("categories")), s: Session = Depends(get_session)):
     row = s.get(Category, category_id)
     if not row: raise HTTPException(404, "دسته یافت نشد")
     if s.exec(select(Product).where(Product.category_id == category_id)).first():
@@ -87,7 +88,7 @@ def delete_category(category_id: str, _: User = Depends(admin_user), s: Session 
 
 
 @admin.post("/coupons", status_code=201)
-def create_coupon(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_coupon(data: dict, _: User = Depends(require_permission("coupons")), s: Session = Depends(get_session)):
     code = str(data["code"]).strip().upper()
     if s.exec(select(Coupon).where(Coupon.code == code)).first(): raise HTTPException(409, "کد تکراری است")
     row = Coupon(code=code, discount_type=data["discount_type"], discount_value=data["discount_value"], min_order_amount=data.get("min_order_amount", 0), expires_at=data.get("expires_at"), usage_limit=data.get("usage_limit", 0))
@@ -95,12 +96,12 @@ def create_coupon(data: dict, _: User = Depends(admin_user), s: Session = Depend
 
 
 @admin.get("/coupons")
-def admin_coupons(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def admin_coupons(_: User = Depends(require_permission("coupons")), s: Session = Depends(get_session)):
     return s.exec(select(Coupon).order_by(Coupon.code)).all()
 
 
 @admin.patch("/coupons/{coupon_id}")
-def update_coupon(coupon_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_coupon(coupon_id: str, data: dict, _: User = Depends(require_permission("coupons")), s: Session = Depends(get_session)):
     row = s.get(Coupon, coupon_id)
     if not row: raise HTTPException(404, "کد یافت نشد")
     for key in ("discount_type", "discount_value", "min_order_amount", "expires_at", "usage_limit"):
@@ -109,24 +110,24 @@ def update_coupon(coupon_id: str, data: dict, _: User = Depends(admin_user), s: 
 
 
 @admin.delete("/coupons/{coupon_id}")
-def delete_coupon(coupon_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_coupon(coupon_id: str, _: User = Depends(require_permission("coupons")), s: Session = Depends(get_session)):
     row = s.get(Coupon, coupon_id)
     if not row: raise HTTPException(404, "کد یافت نشد")
     s.delete(row); s.commit(); return {"ok": True}
 
 
 @admin.post("/carousels", status_code=201)
-def create_carousel(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_carousel(data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = Carousel(**data); s.add(row); s.commit(); invalidate_home(); s.refresh(row); return row
 
 
 @admin.get("/carousels")
-def admin_carousels(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def admin_carousels(_: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     return s.exec(select(Carousel).order_by(Carousel.sort_order)).all()
 
 
 @admin.patch("/carousels/{carousel_id}")
-def update_carousel(carousel_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_carousel(carousel_id: str, data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(Carousel, carousel_id)
     if not row: raise HTTPException(404, "بنر یافت نشد")
     for key, value in data.items():
@@ -135,7 +136,7 @@ def update_carousel(carousel_id: str, data: dict, _: User = Depends(admin_user),
 
 
 @admin.delete("/carousels/{carousel_id}")
-def delete_carousel(carousel_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_carousel(carousel_id: str, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(Carousel, carousel_id)
     if not row: raise HTTPException(404, "بنر یافت نشد")
     s.delete(row); s.commit(); invalidate_home(); return {"ok": True}
@@ -148,7 +149,7 @@ def public_carousels(s: Session = Depends(get_session)):
 
 
 @admin.post("/products/{product_id}/images", status_code=201)
-def add_image(product_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def add_image(product_id: str, data: dict, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     if not s.get(Product, product_id): raise HTTPException(404, "محصول یافت نشد")
     if data.get("is_primary"):
         for image in s.exec(select(ProductImage).where(ProductImage.product_id == product_id)).all(): image.is_primary = False
@@ -157,7 +158,7 @@ def add_image(product_id: str, data: dict, _: User = Depends(admin_user), s: Ses
 
 
 @admin.post("/products/{product_id}/images/upload", status_code=201)
-async def upload_image(product_id: str, file: UploadFile = File(...), _: User = Depends(admin_user), s: Session = Depends(get_session)):
+async def upload_image(product_id: str, file: UploadFile = File(...), _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     if not s.get(Product, product_id): raise HTTPException(404, "محصول یافت نشد")
     allowed = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
     if file.content_type not in allowed: raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود")
@@ -170,7 +171,7 @@ async def upload_image(product_id: str, file: UploadFile = File(...), _: User = 
 
 
 @admin.patch("/products/{product_id}/images/{image_id}/primary")
-def primary_image(product_id: str, image_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def primary_image(product_id: str, image_id: str, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     image = s.get(ProductImage, image_id)
     if not image or image.product_id != product_id: raise HTTPException(404, "تصویر یافت نشد")
     for row in s.exec(select(ProductImage).where(ProductImage.product_id == product_id)).all(): row.is_primary = row.id == image_id
@@ -178,7 +179,7 @@ def primary_image(product_id: str, image_id: str, _: User = Depends(admin_user),
 
 
 @admin.delete("/products/{product_id}/images/{image_id}")
-def delete_image(product_id: str, image_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_image(product_id: str, image_id: str, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     image = s.get(ProductImage, image_id)
     if not image or image.product_id != product_id: raise HTTPException(404, "تصویر یافت نشد")
     s.delete(image); s.commit(); return {"ok": True}
@@ -191,7 +192,7 @@ class ProductIn(BaseModel):
     compare_at_price: float | None = None
 
 @admin.post("/products", status_code=201)
-def create_product(p: ProductIn, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_product(p: ProductIn, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     if s.exec(select(Product).where((Product.slug == p.slug) | (Product.sku == p.sku))).first():
         raise HTTPException(409, "slug یا SKU تکراری است")
     data = p.model_dump()
@@ -201,11 +202,11 @@ def create_product(p: ProductIn, _: User = Depends(admin_user), s: Session = Dep
     row = Product(**data); s.add(row); s.commit(); s.refresh(row); return row
 
 @admin.get("/products")
-def products(_: User = Depends(admin_user), s: Session = Depends(get_session), offset: int = 0, limit: int = Query(50, le=100)):
+def products(_: User = Depends(require_permission("products")), s: Session = Depends(get_session), offset: int = 0, limit: int = Query(50, le=100)):
     return s.exec(select(Product).offset(offset).limit(limit)).all()
 
 @admin.patch("/products/{product_id}")
-def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_product(product_id: str, p: dict, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     row = s.get(Product, product_id)
     if not row:
         raise HTTPException(404, "محصول یافت نشد")
@@ -234,18 +235,18 @@ def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: S
     return row
 
 @admin.delete("/products/{product_id}")
-def delete_product(product_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_product(product_id: str, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     row=s.get(Product,product_id)
     if not row: raise HTTPException(404,"محصول یافت نشد")
     row.is_active=False; s.add(row); s.commit(); return {"ok":True}
 
 @admin.post("/products/{product_id}/related/{related_id}", status_code=201)
-def related(product_id: str, related_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def related(product_id: str, related_id: str, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     if not s.get(Product, product_id) or not s.get(Product, related_id): raise HTTPException(404,"محصول یافت نشد")
     row=RelatedProduct(product_id=product_id, related_product_id=related_id); s.add(row); s.commit(); return row
 
 @admin.get("/stock-alerts")
-def stock_alerts(threshold: int = 5, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def stock_alerts(threshold: int = 5, _: User = Depends(require_permission("products")), s: Session = Depends(get_session)):
     return s.exec(select(Product).where(Product.stock_qty <= threshold, Product.is_active == True)).all()  # noqa
 
 @public.get("/products/{product_id}/related")
@@ -262,7 +263,7 @@ class ArticleIn(BaseModel):
 
 
 @admin.post("/article-categories", status_code=201)
-def create_article_category(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_article_category(data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     if s.exec(select(ArticleCategory).where(ArticleCategory.slug == data["slug"])).first():
         raise HTTPException(409, "slug تکراری است")
     row = ArticleCategory(name=data["name"], slug=data["slug"])
@@ -270,12 +271,12 @@ def create_article_category(data: dict, _: User = Depends(admin_user), s: Sessio
 
 
 @admin.get("/article-categories")
-def article_categories(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def article_categories(_: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     return s.exec(select(ArticleCategory).order_by(ArticleCategory.name)).all()
 
 
 @admin.patch("/article-categories/{category_id}")
-def update_article_category(category_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_article_category(category_id: str, data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(ArticleCategory, category_id)
     if not row:
         raise HTTPException(404, "دسته مقاله یافت نشد")
@@ -291,7 +292,7 @@ def update_article_category(category_id: str, data: dict, _: User = Depends(admi
 
 
 @admin.delete("/article-categories/{category_id}")
-def delete_article_category(category_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_article_category(category_id: str, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(ArticleCategory, category_id)
     if not row:
         raise HTTPException(404, "دسته مقاله یافت نشد")
@@ -303,7 +304,7 @@ def delete_article_category(category_id: str, _: User = Depends(admin_user), s: 
 
 
 @admin.get("/articles")
-def admin_articles(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def admin_articles(_: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     rows = s.exec(select(Article).order_by(Article.created_at.desc())).all()
     cats = {c.id: c.name for c in s.exec(select(ArticleCategory)).all()}
     # cache author names to avoid N+1
@@ -328,12 +329,12 @@ def session_exec_ids(session: Session, model, ids: set[str]):
 
 # Article tags admin
 @admin.get("/article-tags")
-def admin_article_tags(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def admin_article_tags(_: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     return s.exec(select(ArticleTag).order_by(ArticleTag.name)).all()
 
 
 @admin.post("/article-tags", status_code=201)
-def create_article_tag(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_article_tag(data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     slug = data.get("slug") or _slugify_local(data.get("name",""))
     if s.exec(select(ArticleTag).where(ArticleTag.slug == slug)).first():
         raise HTTPException(409, "slug تگ تکراری است")
@@ -351,7 +352,7 @@ def _slugify_local(value: str) -> str:
 
 
 @admin.patch("/article-tags/{tag_id}")
-def update_article_tag(tag_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_article_tag(tag_id: str, data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(ArticleTag, tag_id)
     if not row:
         raise HTTPException(404, "تگ یافت نشد")
@@ -364,7 +365,7 @@ def update_article_tag(tag_id: str, data: dict, _: User = Depends(admin_user), s
 
 
 @admin.delete("/article-tags/{tag_id}")
-def delete_article_tag(tag_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_article_tag(tag_id: str, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(ArticleTag, tag_id)
     if not row:
         raise HTTPException(404, "تگ یافت نشد")
@@ -415,7 +416,7 @@ def _sanitize_html(raw: str) -> str:
 
 
 @admin.post("/articles", status_code=201)
-def create_article(p: ArticleIn, u: User = Depends(admin_user), s: Session = Depends(get_session)):
+def create_article(p: ArticleIn, u: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     if s.exec(select(Article).where(Article.slug == p.slug)).first():
         raise HTTPException(409, "slug تکراری است")
     data = p.model_dump(exclude={"tag_slugs"})
@@ -432,6 +433,9 @@ def create_article(p: ArticleIn, u: User = Depends(admin_user), s: Session = Dep
     s.refresh(row)
     _sync_article_tags(s, row.id, p.tag_slugs)
     s.commit()
+    # reload: commit expires the instance (expire_on_commit), which would make
+    # model_dump() return an empty dict and drop id/body from the response
+    s.refresh(row)
     invalidate_home()
     # return with tags
     out = row.model_dump()
@@ -440,7 +444,7 @@ def create_article(p: ArticleIn, u: User = Depends(admin_user), s: Session = Dep
 
 
 @admin.patch("/articles/{article_id}")
-def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_article(article_id: str, data: dict, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(Article, article_id)
     if not row:
         raise HTTPException(404, "مقاله یافت نشد")
@@ -460,6 +464,7 @@ def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s
         row.published_at = datetime.now(UTC)
     s.add(row)
     s.commit()
+    s.refresh(row)  # commit expires the instance; reload so model_dump is not empty
     invalidate_home()
     out = row.model_dump()
     out["tags"] = _get_article_tags(s, row.id)
@@ -467,7 +472,7 @@ def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s
 
 
 @admin.delete("/articles/{article_id}")
-def delete_article(article_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def delete_article(article_id: str, _: User = Depends(require_permission("content")), s: Session = Depends(get_session)):
     row = s.get(Article, article_id)
     if not row: raise HTTPException(404, "مقاله یافت نشد")
     s.delete(row); s.commit(); return {"ok": True}
@@ -479,14 +484,14 @@ def customer_orders(u: User = Depends(current_user), s: Session = Depends(get_se
 
 
 @admin.get("/orders")
-def admin_orders(_: User = Depends(admin_user), s: Session = Depends(get_session), status: str | None = None, offset: int = 0, limit: int = Query(50, le=100)):
+def admin_orders(_: User = Depends(require_permission("orders")), s: Session = Depends(get_session), status: str | None = None, offset: int = 0, limit: int = Query(50, le=100)):
     query = select(Order).order_by(Order.created_at.desc())
     if status: query = query.where(Order.status == status)
     return s.exec(query.offset(offset).limit(limit)).all()
 
 
 @admin.post("/orders/expire-stale")
-def expire_stale_orders_admin(_: User = Depends(admin_user), s: Session = Depends(get_session)):
+def expire_stale_orders_admin(_: User = Depends(require_permission("orders")), s: Session = Depends(get_session)):
     """Expire pending orders older than 30 minutes and restore stock (Phase 5 TTL)."""
     from app.services.orders import expire_stale_pending_orders
 
@@ -495,7 +500,7 @@ def expire_stale_orders_admin(_: User = Depends(admin_user), s: Session = Depend
 
 
 @admin.patch("/orders/{order_id}/status")
-def update_order_status(order_id: str, data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def update_order_status(order_id: str, data: dict, _: User = Depends(require_permission("orders")), s: Session = Depends(get_session)):
     row = s.get(Order, order_id)
     if not row:
         raise HTTPException(404, "سفارش یافت نشد")
@@ -618,7 +623,7 @@ def public_article_categories(s: Session = Depends(get_session)):
     return s.exec(select(ArticleCategory).order_by(ArticleCategory.name)).all()
 
 @admin.post("/settings")
-def set_setting(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+def set_setting(data: dict, _: User = Depends(require_permission("settings")), s: Session = Depends(get_session)):
     key=data.get("key"); row=s.exec(select(Setting).where(Setting.key==key)).first()
     if row: row.value=str(data.get("value","")); row.value_type=data.get("value_type","string")
     else: row=Setting(key=key,value=str(data.get("value","")),value_type=data.get("value_type","string"))
@@ -650,10 +655,10 @@ def mark_read(notification_id: str, u: User=Depends(current_user), s: Session=De
     row.is_read=True; s.add(row); s.commit(); return {"ok":True}
 
 @admin.get("/activity")
-def activity(_: User=Depends(admin_user), s: Session=Depends(get_session), limit:int=Query(100,le=500)):
+def activity(_: User=Depends(require_permission("dashboard")), s: Session=Depends(get_session), limit:int=Query(100,le=500)):
     return s.exec(select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit)).all()
 
 @admin.get("/analytics")
-def analytics(_: User=Depends(admin_user), s: Session=Depends(get_session)):
+def analytics(_: User=Depends(require_permission("dashboard")), s: Session=Depends(get_session)):
     from sqlalchemy import func
     return {"orders": s.exec(select(func.count(Order.id))).one(), "revenue": s.exec(select(func.coalesce(func.sum(Order.total_amount),0)).where(Order.status!="cancelled")).one()}

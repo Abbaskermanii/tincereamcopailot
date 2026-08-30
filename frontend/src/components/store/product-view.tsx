@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import DOMPurify from "dompurify";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { Heart, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
@@ -18,10 +18,7 @@ import { StockNotify } from "@/components/store/stock-notify";
 import { faNum } from "@/lib/format";
 import { mediaUrl } from "@/lib/api";
 
-function sanitizeHtml(html: string): string {
-  if (typeof window === "undefined") return html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
-  return DOMPurify.sanitize(html);
-}
+
 
 interface ProductImage {
   id: string;

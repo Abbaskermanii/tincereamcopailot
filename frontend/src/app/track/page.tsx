@@ -137,7 +137,7 @@ function TrackInner() {
                     className={
                       "absolute -right-[37px] flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors " +
                       (done
-                        ? "border-firouzeh bg-firouzeh text-white"
+                        ? "border-firouzeh bg-firouzeh text-char"
                         : "border-char/20 bg-surface text-char-soft dark:bg-black/25")
                     }
                   >

@@ -1,7 +1,7 @@
 """add avatar_url to users
 
 Revision ID: 71591faa38b8
-Revises: 84edf3cc7bb3
+Revises: f3e4a9b8c7d6
 Create Date: 2026-08-30
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 import sqlmodel
 
 revision: str = '71591faa38b8'
-down_revision: Union[str, None] = '84edf3cc7bb3'
+down_revision: Union[str, None] = 'f3e4a9b8c7d6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

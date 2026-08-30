@@ -48,6 +48,7 @@ class HomepageSection(UUIDMixin, TimestampMixin, table=True):
     source: ProductSource | None = Field(default=None, index=True)
     category_id: str | None = Field(default=None, foreign_key="categories.id")
     product_ids: str = "[]"  # JSON list for source=manual
+    image_url: str | None = Field(default=None, max_length=1024)  # brand_story image
 
     def manual_ids(self) -> list[str]:
         try:

@@ -1,7 +1,7 @@
 """add missing subtitle and variant image_url
 
 Revision ID: c8d9e0f1a2b3
-Revises: b7c9d1e2f4a6
+Revises: ac1b3d7d51cb
 Create Date: 2026-08-30 07:00:00.000000
 
 """
@@ -14,7 +14,7 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = 'c8d9e0f1a2b3'
-down_revision: Union[str, None] = 'b7c9d1e2f4a6'
+down_revision: Union[str, None] = 'ac1b3d7d51cb'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

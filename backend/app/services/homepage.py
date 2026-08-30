@@ -197,12 +197,12 @@ def _section_payload(session: Session, s: HomepageSection) -> dict:
             {"id": f.id, "question": f.question, "answer": f.answer} for f in rows
         ]
     elif s.kind == HomepageSectionKind.brand_story:
-        # static brand story – admin can customize title/subtitle, body is fixed for now
+        # admin can customize title/subtitle/image via homepage section settings
         payload["story"] = {
             "title": s.title or "داستان تن‌سِرام",
             "subtitle": s.subtitle or "سفال، با دستِ ایرانی گرم می‌شود",
             "body": "هر قطعه در کارگاه تن‌سِرام از خاک رس سفید و لعاب لاجوردی با دست چرخ‌کاری می‌شود؛ از کوره تا میز شما، با عشق و دقت.",
-            "image_url": None,
+            "image_url": getattr(s, "image_url", None),
         }
     elif s.kind == HomepageSectionKind.testimonials:
         # top approved reviews

@@ -7,6 +7,7 @@ import { MediaUploader } from "@/components/admin/MediaUploader";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
 import { toPersianDigits } from "@/lib/format";
+import Image from "next/image";
 import { mediaUrl } from "@/lib/api";
 
 interface Article {
@@ -96,7 +97,7 @@ export default function AdminArticlesPage() {
           rows={filtered}
           empty="مقاله‌ای یافت نشد."
           columns={[
-            { key: "cover", label: "کاور", render: (r: Article) => r.cover_url ? <img src={mediaUrl(r.cover_url)} alt={r.title} className="h-10 w-14 rounded-lg object-cover" /> : <span className="flex h-10 w-14 items-center justify-center rounded-lg bg-slip text-xs text-char-soft">—</span> },
+            { key: "cover", label: "کاور", render: (r: Article) => r.cover_url ? <Image src={mediaUrl(r.cover_url)} alt={r.title} width={56} height={40} unoptimized className="h-10 w-14 rounded-lg object-cover" /> : <span className="flex h-10 w-14 items-center justify-center rounded-lg bg-slip text-xs text-char-soft">—</span> },
             { key: "title", label: "عنوان", render: (r) => <span className="font-medium">{r.title}</span> },
             { key: "category", label: "دسته", render: (r: Article) => <span className="text-xs text-ink-soft">{r.category_name ?? "—"}</span> },
             { key: "slug", label: "شناسه", render: (r) => <span className="text-ink-soft">{r.slug}</span> },

@@ -86,7 +86,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:gap-4 sm:px-4 md:h-20 md:px-6">
         <Link href="/" className="shrink-0 text-xl font-extrabold tracking-tight">
           تن‌سِرام
-          <span className="mr-1 hidden align-middle text-xs font-medium text-clay sm:inline">.سرامیک دست‌ساز</span>
+          <span className="mr-1 hidden align-middle text-xs font-medium text-clay-deep sm:inline dark:text-clay">.سرامیک دست‌ساز</span>
         </Link>
 
         <nav aria-label="ناوبری اصلی" className="hidden items-center gap-5 lg:flex">

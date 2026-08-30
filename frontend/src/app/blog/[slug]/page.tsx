@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { api, mediaUrl, SITE_URL } from "@/lib/api";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { Calendar, Clock, Eye, Tag, ChevronLeft, Home } from "lucide-react";
 import { ShareButton } from "@/components/store/share-button";
 
@@ -11,8 +12,14 @@ export const revalidate = 30;
 interface Props { params: { slug: string } }
 
 async function getArticle(slug: string) {
-  const article = await api.article(slug);
-  return article;
+  try {
+    const article = await api.article(slug);
+    return article;
+  } catch {
+    // API temporarily unavailable — return null to trigger notFound()
+    // The page will be retried on next ISR cycle
+    return null;
+  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -75,7 +82,7 @@ export default async function ArticlePage({ params }: Props) {
   const readingTime = article.reading_time_minutes ?? 0;
   const viewCount = article.view_count ?? 0;
   const cover = article.cover_url ?? article.cover_image_url ?? null;
-  const { html: bodyWithIds, toc } = addHeadingIds(article.body || "");
+  const { html: bodyWithIds, toc } = addHeadingIds(sanitizeHtml(article.body || ""));
 
   const site = SITE_URL;
   const articleJsonLd = {
@@ -84,11 +91,11 @@ export default async function ArticlePage({ params }: Props) {
     headline: article.title,
     image: cover ? [mediaUrl(cover)] : [],
     author: { "@type": "Person", name: article.author_name ?? "تن‌سِرام" },
-    publisher: { "@type": "Organization", name: "تن‌سِرام", logo: { "@type": "ImageObject", url: `${site}/logo.png` } },
+    publisher: { "@type": "Organization", name: "تن‌سِرام", logo: { "@type": "ImageObject", url: `${site}/logo.svg` } },
     datePublished: article.published_at,
     dateModified: article.updated_at ?? article.published_at,
     description: article.excerpt ?? "",
-    mainEntityOfPage: `${site}/blog/${article.slug}`,
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${site}/blog/${article.slug}` },
   };
   const breadcrumbLd = {
     "@context": "https://schema.org",

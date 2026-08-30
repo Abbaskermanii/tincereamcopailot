@@ -5,6 +5,7 @@ import { Tags, Plus } from "lucide-react";
 import { ConfirmDialog, DataTable, EmptyState, ErrorBanner, Field, FormActions, Modal, PageHeader, TextInput, TextArea, Toolbar } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
+import Image from "next/image";
 import { mediaUrl } from "@/lib/api";
 
 interface Brand {
@@ -60,7 +61,7 @@ export default function AdminBrandsPage() {
           rows={filtered}
           empty="برندی یافت نشد."
           columns={[
-            { key: "logo", label: "لوگو", render: (r: Brand) => r.logo_url ? <img src={mediaUrl(r.logo_url)} alt={r.name} className="h-10 w-10 rounded-xl object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slip text-xs text-char-soft">—</span> },
+            { key: "logo", label: "لوگو", render: (r: Brand) => r.logo_url ? <Image src={mediaUrl(r.logo_url)} alt={r.name} width={40} height={40} unoptimized className="h-10 w-10 rounded-xl object-cover" /> : <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slip text-xs text-char-soft">—</span> },
             { key: "name", label: "نام", render: (r) => <span className="font-medium">{r.name}</span> },
             { key: "slug", label: "شناسه", render: (r) => <span className="text-ink-soft">{r.slug}</span> },
             { key: "description", label: "توضیحات", render: (r) => <span className="line-clamp-1 text-ink-soft">{r.description ?? "—"}</span> },

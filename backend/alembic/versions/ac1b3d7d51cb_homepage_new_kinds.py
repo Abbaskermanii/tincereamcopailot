@@ -1,7 +1,7 @@
 """homepage new kinds: brand_story, testimonials, featured_category_spotlight
 
 Revision ID: ac1b3d7d51cb
-Revises: 19ec71079e51
+Revises: 84edf3cc7bb3
 Create Date: 2026-08-30
 """
 
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = 'ac1b3d7d51cb'
-down_revision: Union[str, None] = '19ec71079e51'
+down_revision: Union[str, None] = '84edf3cc7bb3'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

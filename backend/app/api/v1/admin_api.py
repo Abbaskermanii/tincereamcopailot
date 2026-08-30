@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, text
 from sqlmodel import Session, select
 
-from app.api.v1.auth import admin_user
+from app.api.v1.deps import admin_user
 from app.core.permissions import PERMISSIONS, ROLE_PRESETS, require_permission
 from app.db.session import get_session
 from app.models import (
@@ -1269,7 +1269,7 @@ def all_settings(_: None = _require_perm("settings"), session: Session = Depends
 
 @admin.get("/activity")
 def activity_log(
-    _: None = Depends(admin_user),
+    _: None = _require_perm("dashboard"),
     session: Session = Depends(get_session),
     limit: int = Query(100, le=500),
 ):
@@ -1429,7 +1429,7 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "w
 
 
 @admin.post("/media/upload", status_code=201)
-async def upload_media(file: UploadFile = File(...), user: User = Depends(admin_user), session: Session = Depends(get_session)):
+async def upload_media(file: UploadFile = File(...), user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
     """Upload any admin image (brand logo, category, article cover, carousel, …)
     and return its URL. Product images keep their dedicated endpoint."""
     content_type = file.content_type or ""

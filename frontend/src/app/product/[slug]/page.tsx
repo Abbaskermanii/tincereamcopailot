@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { api, SITE_URL } from "@/lib/api";
+import { api, mediaUrl, SITE_URL } from "@/lib/api";
 import { ProductView } from "@/components/store/product-view";
 import { RelatedProducts } from "@/components/store/related-products";
 import { ProductReviews } from "@/components/store/product-reviews";
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${title} | تن‌سرام`,
       description,
-      images: product.images?.[0]?.url ? [{ url: product.images[0].url }] : undefined,
+      images: product.images?.[0]?.url ? [{ url: mediaUrl(product.images[0].url), width: 1200, height: 630, alt: product.name }] : undefined,
       type: "website",
     },
   };
@@ -70,7 +70,7 @@ export default async function ProductPage({ params }: Props) {
     "@type": "Product",
     name: product.name,
     description: product.short_description ?? product.description?.slice(0, 300) ?? "",
-    image: product.images?.[0]?.url ? [product.images[0].url] : [],
+    image: (product.images ?? []).map((img: { url: string }) => mediaUrl(img.url)).filter(Boolean),
     sku: product.sku ?? "",
     brand: { "@type": "Brand", name: "TinCeram" },
     offers: {
@@ -97,7 +97,7 @@ export default async function ProductPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
-      <TrackRecentlyViewed slug={product.slug} name={product.name} price={product.price} imageUrl={product.images?.[0]?.url ?? ""} />
+      <TrackRecentlyViewed slug={product.slug} name={product.name} price={product.price} imageUrl={mediaUrl(product.images?.[0]?.url) ?? ""} />
 
       <ProductView product={viewProduct} />
 

@@ -7,7 +7,8 @@ from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession  # noqa: F401
 
 from app.db.session import get_session
-from app.api.v1.auth import admin_user
+from app.api.v1.deps import admin_user
+from app.core.permissions import require_permission
 
 router = APIRouter()
 
@@ -15,7 +16,7 @@ router = APIRouter()
 @router.get("/admin/stats")
 async def admin_stats(
     session=Depends(get_session),
-    user=Depends(admin_user),
+    user=Depends(require_permission("dashboard")),
 ) -> dict:
     since = datetime.now(UTC) - timedelta(days=30)
 
