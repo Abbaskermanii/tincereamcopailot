@@ -8,6 +8,7 @@ import {
   AdminCard, ConfirmDialog, Field, FormActions, Modal, PageHeader, SelectInput, TextArea, TextInput, Toggle,
 } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { useAdminMutation, useAdminResource, useDebounced } from "@/lib/admin-hooks";
 import { useToast } from "@/components/ui/toast-provider";
 import { mediaUrl } from "@/lib/api";
@@ -169,7 +170,7 @@ export default function AdminProductEditorPage() {
             </div>
             <div className="sm:col-span-2">
               <Field label="توضیحات کامل">
-                <TextArea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={6} />
+                <RichTextEditor value={form.description} onChange={(html) => setForm({ ...form, description: html })} placeholder="توضیحات کامل محصول…" />
               </Field>
             </div>
             <Toggle checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} label="محصول فعال باشد (در فروشگاه دیده شود)" />

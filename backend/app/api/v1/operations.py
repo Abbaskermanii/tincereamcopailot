@@ -156,7 +156,11 @@ class ProductIn(BaseModel):
 def create_product(p: ProductIn, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     if s.exec(select(Product).where((Product.slug == p.slug) | (Product.sku == p.sku))).first():
         raise HTTPException(409, "slug یا SKU تکراری است")
-    row = Product(**p.model_dump()); s.add(row); s.commit(); s.refresh(row); return row
+    data = p.model_dump()
+    data["description"] = _sanitize_html(data.get("description") or "")
+    if data.get("short_description"):
+        data["short_description"] = _sanitize_html(str(data["short_description"]))
+    row = Product(**data); s.add(row); s.commit(); s.refresh(row); return row
 
 @admin.get("/products")
 def products(_: User = Depends(admin_user), s: Session = Depends(get_session), offset: int = 0, limit: int = Query(50, le=100)):
@@ -182,6 +186,8 @@ def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: S
     allowed = {"name", "slug", "category_id", "description", "short_description", "price", "compare_at_price", "stock_qty", "sku", "weight_grams", "material", "dimensions", "is_active", "brand_id", "meta_title", "meta_description"}
     for k, v in p.items():
         if k in allowed:
+            if k in ("description", "short_description") and isinstance(v, str):
+                v = _sanitize_html(v)
             setattr(row, k, v)
     s.add(row)
     s.commit()
@@ -267,22 +273,45 @@ def admin_articles(_: User = Depends(admin_user), s: Session = Depends(get_sessi
     ]
 
 def _sanitize_html(raw: str) -> str:
-    """Minimal sanitization for Article.body — strip script/style and on* handlers."""
-    import re
+    """Allowlist-based HTML sanitization for rich-text (article/product body).
 
-    # Remove script/style/iframe/object/embed tags and content
-    cleaned = re.sub(r"<(script|style|iframe|object|embed|link|meta)[^>]*>.*?</\1>", "", raw, flags=re.IGNORECASE | re.DOTALL)
-    cleaned = re.sub(r"<(script|style|iframe|object|embed|link|meta)[^>]*/?>", "", cleaned, flags=re.IGNORECASE)
-    # Remove event handlers like onclick= (quoted, single-quoted, and unquoted)
-    cleaned = re.sub(r"\s+on\w+\s*=\s*\"[^\"]*\"", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+on\w+\s*=\s*'[^']*'", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"\s+on\w+\s*=\s*[^\s\"'>]+", "", cleaned, flags=re.IGNORECASE)
-    # Remove javascript: and data: URLs
-    cleaned = re.sub(r"javascript\s*:", "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r"data\s*:\s*text/html", "", cleaned, flags=re.IGNORECASE)
-    # Remove style attributes with expression() or javascript:
-    cleaned = re.sub(r"\s+style\s*=\s*\"[^\"]*expression[^\"]*\"", "", cleaned, flags=re.IGNORECASE)
-    return cleaned
+    Uses nh3 (ammonia) when available; falls back to regex stripping.
+    Allowed tags are those produced by Tiptap toolbar: p/br, strong/em, headings h2-h4,
+    lists ul/ol/li, blockquote, a[href], img[src,alt].
+    """
+    if not raw:
+        return ""
+    try:
+        import nh3  # type: ignore
+
+        allowed_tags = {"p", "br", "strong", "b", "em", "i", "u", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "a", "img", "figure", "figcaption", "span", "div"}
+        allowed_attrs = {
+            "a": {"href", "title", "target", "rel"},
+            "img": {"src", "alt", "title", "width", "height"},
+            "span": {"class"},
+            "div": {"class"},
+        }
+        # nh3 wants dict[str, set[str]]
+        return nh3.clean(
+            raw,
+            tags=allowed_tags,
+            attributes=allowed_attrs,
+            url_schemes={"http", "https", "mailto"},
+            link_rel=None,
+        )
+    except Exception:
+        import re
+
+        # fallback: strip script/style and on* handlers
+        cleaned = re.sub(r"<(script|style|iframe|object|embed|link|meta)[^>]*>.*?</\1>", "", raw, flags=re.IGNORECASE | re.DOTALL)
+        cleaned = re.sub(r"<(script|style|iframe|object|embed|link|meta)[^>]*/?>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\s+on\w+\s*=\s*"[^"]*"', "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+on\w+\s*=\s*'[^']*'", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s+on\w+\s*=\s*[^\s\"'>]+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"javascript\s*:", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"data\s*:\s*text/html", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r'\s+style\s*=\s*"[^"]*expression[^"]*"', "", cleaned, flags=re.IGNORECASE)
+        return cleaned
 
 
 @admin.post("/articles", status_code=201)

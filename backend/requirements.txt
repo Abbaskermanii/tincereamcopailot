@@ -29,3 +29,6 @@ python-jose[cryptography]==3.3.0
 # HTTP client (ZarinPal + tests)
 httpx==0.28.1
 minio==7.2.15
+
+# HTML sanitization for rich-text editor (articles/products)
+nh3==0.2.18

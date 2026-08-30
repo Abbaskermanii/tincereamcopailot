@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ScrollText, Plus } from "lucide-react";
 import { ConfirmDialog, DataTable, DateInput, EmptyState, Field, FormActions, Modal, PageHeader, Pagination, TextInput, TextArea, Toolbar } from "@/components/admin/kit";
 import { MediaUploader } from "@/components/admin/MediaUploader";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
 import { toPersianDigits } from "@/lib/format";
 import { mediaUrl } from "@/lib/api";
@@ -134,7 +135,7 @@ export default function AdminArticlesPage() {
             <TextArea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} />
           </Field>
           <Field label="متن مقاله" required>
-            <TextArea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={10} className="min-h-48" />
+            <RichTextEditor value={form.body} onChange={(html) => setForm({ ...form, body: html })} placeholder="متن کامل مقاله را اینجا بنویسید…" />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="تاریخ انتشار">

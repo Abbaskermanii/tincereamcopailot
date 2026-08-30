@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import DOMPurify from "dompurify";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { PriceTag } from "@/components/ui/price-tag";
@@ -9,6 +10,11 @@ import { AddToCartPanel } from "@/components/store/add-to-cart";
 import { StickyBuyBar } from "@/components/store/sticky-buy-bar";
 import { StockNotify } from "@/components/store/stock-notify";
 import { faNum } from "@/lib/format";
+
+function sanitizeHtml(html: string): string {
+  if (typeof window === "undefined") return html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "").replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+  return DOMPurify.sanitize(html);
+}
 
 interface ProductImage {
   id: string;
@@ -152,7 +158,11 @@ export function ProductView({ product }: { product: Product }) {
 
           <details className="group rounded-wobble bg-surface p-5" open>
             <summary className="cursor-pointer list-none font-bold">توضیحات کامل</summary>
-            <p className="mt-3 whitespace-pre-line text-sm leading-8 text-char-soft dark:text-ink-soft">{product.description}</p>
+            {product.description && product.description.includes("<") ? (
+              <div className="prose prose-sm mt-3 max-w-none leading-8 text-char-soft dark:prose-invert dark:text-ink-soft [&_h2]:font-extrabold [&_h3]:font-bold [&_a]:text-lajvard" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
+            ) : (
+              <p className="mt-3 whitespace-pre-line text-sm leading-8 text-char-soft dark:text-ink-soft">{product.description}</p>
+            )}
           </details>
 
           <details className="rounded-wobble bg-surface p-5">
