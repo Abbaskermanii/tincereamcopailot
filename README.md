@@ -1,2 +1,1 @@
-# tinceram
-# tincereamcopailot
+
