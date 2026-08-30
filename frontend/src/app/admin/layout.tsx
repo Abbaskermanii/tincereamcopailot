@@ -30,6 +30,7 @@ const NAV: NavGroup[] = [
       { label: "محصولات", href: "/admin/products", icon: Package },
       { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: FolderTree },
       { label: "برندها", href: "/admin/brands", icon: Tags },
+      { label: "ویژگی‌ها", href: "/admin/attributes", icon: Tags },
       { label: "هشدار موجودی", href: "/admin/stock-alerts", icon: Boxes },
     ],
   },

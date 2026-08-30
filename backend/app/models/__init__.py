@@ -37,6 +37,7 @@ from app.models.operations import (
     Notification, RelatedProduct, Setting,
 )
 from app.models.variant import ProductVariant
+from app.models.attribute import Attribute, AttributeValue, ProductAttribute, ProductVariantAttributeValue
 
 __all__ = [
     "Brand",
@@ -49,6 +50,7 @@ __all__ = [
     "HomepageSection", "HomepageSectionKind", "ProductSource",
     "Order", "OrderItem", "OrderStatus",
     "Product", "ProductImage", "ProductVariant",
+    "Attribute", "AttributeValue", "ProductAttribute", "ProductVariantAttributeValue",
     "Address", "OtpCode", "OtpPurpose", "PasswordResetToken",
     "RefreshToken", "Role", "User", "WishlistItem",
     "ActivityLog", "Article", "ArticleCategory", "Carousel",

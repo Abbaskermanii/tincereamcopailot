@@ -3,7 +3,7 @@ from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
 from app.db.session import get_session
-from app.models import Brand, Category, Product, ProductImage, ProductVariant
+from app.models import Attribute, AttributeValue, Brand, Category, Product, ProductAttribute, ProductImage, ProductVariant, ProductVariantAttributeValue
 from app.schemas.store import (
     CategoryDetail,
     CategoryNode,
@@ -30,10 +30,61 @@ def _list_item(p: Product) -> dict:
     }
 
 
-def _detail(p: Product, variants: list[ProductVariant] | None = None) -> dict:
+def _detail(p: Product, variants: list[ProductVariant] | None = None, session: Session | None = None) -> dict:
     base = _list_item(p)
     cat = p.category
     var_list = variants if variants is not None else []
+    # fetch attributes for this product if session provided
+    attributes_out = []
+    if session is not None:
+        try:
+            links = session.exec(select(ProductAttribute).where(ProductAttribute.product_id == p.id).order_by(ProductAttribute.sort_order)).all()  # type: ignore[arg-type]
+            for link in links:
+                attr = session.get(Attribute, link.attribute_id)
+                if not attr:
+                    continue
+                vals = session.exec(select(AttributeValue).where(AttributeValue.attribute_id == attr.id).order_by(AttributeValue.sort_order)).all()  # type: ignore[arg-type]
+                attributes_out.append({
+                    "id": attr.id,
+                    "name": attr.name,
+                    "slug": attr.slug,
+                    "sort_order": attr.sort_order,
+                    "values": [
+                        {"id": v.id, "attribute_id": v.attribute_id, "value": v.value, "slug": v.slug, "swatch_image_url": v.swatch_image_url, "sort_order": v.sort_order}
+                        for v in vals
+                    ],
+                })
+        except Exception:
+            attributes_out = []
+
+    # variant attribute values mapping
+    variant_out = []
+    for v in var_list:
+        av_ids: list[str] = []
+        av_details: list[dict] = []
+        if session is not None:
+            try:
+                links = session.exec(select(ProductVariantAttributeValue).where(ProductVariantAttributeValue.variant_id == v.id)).all()
+                for link in links:
+                    av_ids.append(link.attribute_value_id)
+                    av = session.get(AttributeValue, link.attribute_value_id)
+                    if av:
+                        av_details.append({"id": av.id, "attribute_id": av.attribute_id, "value": av.value, "slug": av.slug, "swatch_image_url": av.swatch_image_url})
+            except Exception:
+                pass
+        variant_out.append({
+            "id": v.id,
+            "name": v.name,
+            "sku": v.sku,
+            "image_url": v.image_url,
+            "price_delta": float(v.price_delta),
+            "absolute_price": float(v.absolute_price) if v.absolute_price is not None else None,
+            "stock_qty": v.stock_qty,
+            "is_active": v.is_active,
+            "attribute_value_ids": av_ids,
+            "attribute_values": av_details,
+        })
+
     return {
         **base,
         "description": p.description,
@@ -54,22 +105,12 @@ def _detail(p: Product, variants: list[ProductVariant] | None = None) -> dict:
                 "alt_text": i.alt_text,
                 "sort_order": i.sort_order,
                 "is_primary": i.is_primary,
+                "attribute_value_id": getattr(i, "attribute_value_id", None),
             }
             for i in sorted(p.images, key=lambda x: x.sort_order)
         ],
-        "variants": [
-            {
-                "id": v.id,
-                "name": v.name,
-                "sku": v.sku,
-                "image_url": v.image_url,
-                "price_delta": float(v.price_delta),
-                "absolute_price": float(v.absolute_price) if v.absolute_price is not None else None,
-                "stock_qty": v.stock_qty,
-                "is_active": v.is_active,
-            }
-            for v in var_list
-        ],
+        "variants": variant_out,
+        "attributes": attributes_out,
     }
 
 
@@ -211,7 +252,21 @@ async def product_detail(slug: str, session: Session = Depends(get_session)) -> 
     variants = session.exec(
         select(ProductVariant).where(ProductVariant.product_id == p.id, ProductVariant.is_active == True).order_by(ProductVariant.sort_order)  # type: ignore[arg-type]
     ).all()
-    return ProductDetail(**_detail(p, variants))
+    return ProductDetail(**_detail(p, variants, session))  # type: ignore[arg-type]
+
+
+@router.get("/attributes", response_model=list[dict])
+async def list_attributes_public(session: Session = Depends(get_session)) -> list[dict]:
+    """Public attributes for storefront filtering (only those used in products)."""
+    attrs = session.exec(select(Attribute).order_by(Attribute.name)).all()
+    out = []
+    for a in attrs:
+        vals = session.exec(select(AttributeValue).where(AttributeValue.attribute_id == a.id).order_by(AttributeValue.sort_order)).all()
+        out.append({
+            "id": a.id, "name": a.name, "slug": a.slug,
+            "values": [{"id": v.id, "value": v.value, "slug": v.slug, "swatch_image_url": v.swatch_image_url} for v in vals]
+        })
+    return out
 
 
 @router.get("/brands", response_model=list[dict])

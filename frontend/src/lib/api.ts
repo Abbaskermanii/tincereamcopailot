@@ -30,6 +30,7 @@ export interface ProductImage {
   alt_text: string;
   sort_order: number;
   is_primary: boolean;
+  attribute_value_id?: string | null;
 }
 
 export interface ProductListItem {
@@ -43,6 +44,23 @@ export interface ProductListItem {
   primary_image_url: string | null;
 }
 
+export interface AttributeValue {
+  id: string;
+  attribute_id: string;
+  value: string;
+  slug: string;
+  swatch_image_url?: string | null;
+  sort_order?: number;
+}
+
+export interface Attribute {
+  id: string;
+  name: string;
+  slug: string;
+  sort_order?: number;
+  values: AttributeValue[];
+}
+
 export interface ProductVariant {
   id: string;
   name: string;
@@ -52,6 +70,8 @@ export interface ProductVariant {
   stock_qty: number;
   is_active: boolean;
   image_url?: string;
+  attribute_value_ids?: string[];
+  attribute_values?: Array<{ id: string; attribute_id: string; value: string; slug: string; swatch_image_url?: string | null }>;
 }
 
 export interface ShippingMethod {
@@ -132,6 +152,7 @@ export const api = {
         discount_percent: number;
         images: ProductImage[];
         variants: ProductVariant[];
+        attributes: Attribute[];
       }
     >(`/products/${slug}`),
   articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string }>>("/articles", 180),
