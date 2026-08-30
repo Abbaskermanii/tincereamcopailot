@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
@@ -28,6 +28,7 @@ from app.models import (
 )
 from app.services import notifier
 from app.services.rate_limit import rate_limit
+from app.services.storage import put_image
 
 router = APIRouter(prefix="/auth")
 users_router = APIRouter(prefix="/users")
@@ -422,6 +423,39 @@ def update_profile(payload: ProfileUpdate, user: User = Depends(current_user), s
     session.commit()
     session.refresh(user)
     return user
+
+
+@users_router.post("/me/avatar", status_code=201)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    allowed = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    content_type = file.content_type or ""
+    if content_type not in allowed:
+        raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود (JPG، PNG یا WebP).")
+    data = await file.read()
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(413, "حجم تصویر باید کمتر از ۲ مگابایت باشد.")
+    if len(data) == 0:
+        raise HTTPException(400, "فایل خالی است.")
+    extension = allowed[content_type]
+    object_name = f"avatars/{user.id}/{secrets.token_hex(12)}.{extension}"
+    url = put_image(object_name, data, content_type)
+    user.avatar_url = url
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return {"avatar_url": url}
+
+
+@users_router.delete("/me/avatar")
+def delete_avatar(user: User = Depends(current_user), session: Session = Depends(get_session)):
+    user.avatar_url = None
+    session.add(user)
+    session.commit()
+    return {"ok": True}
 
 
 @router.get("/users/me")

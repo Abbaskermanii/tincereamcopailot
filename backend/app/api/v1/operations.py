@@ -375,13 +375,29 @@ def update_order_status(order_id: str, data: dict, _: User = Depends(admin_user)
 
 @public.get("/articles")
 def articles(s: Session = Depends(get_session), offset: int=0, limit: int=Query(20,le=100)):
-    return s.exec(select(Article).where(Article.is_published==True).order_by(Article.published_at.desc()).offset(offset).limit(limit)).all() # noqa
+    rows = s.exec(select(Article).where(Article.is_published==True).order_by(Article.published_at.desc()).offset(offset).limit(limit)).all() # noqa
+    out = []
+    for a in rows:
+        author = s.get(User, a.author_id) if a.author_id else None
+        d = a.model_dump()
+        d["author_name"] = author.full_name if author else None
+        d["author_avatar_url"] = author.avatar_url if author and getattr(author, "avatar_url", None) else None
+        out.append(d)
+    return out
 
 @public.get("/articles/{slug}")
 def article(slug: str, s: Session = Depends(get_session)):
     row=s.exec(select(Article).where(Article.slug==slug, Article.is_published==True)).first() # noqa
     if not row: raise HTTPException(404,"مقاله یافت نشد")
-    return row
+    author = s.get(User, row.author_id) if row.author_id else None
+    d = row.model_dump()
+    d["author_name"] = author.full_name if author else None
+    d["author_avatar_url"] = author.avatar_url if author and getattr(author, "avatar_url", None) else None
+    # also include category name for convenience
+    if row.category_id:
+        cat = s.get(ArticleCategory, row.category_id)
+        d["category_name"] = cat.name if cat else None
+    return d
 
 @admin.post("/settings")
 def set_setting(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):

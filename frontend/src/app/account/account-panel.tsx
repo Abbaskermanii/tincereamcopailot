@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { mediaUrl } from "@/lib/api";
@@ -113,12 +113,60 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
   );
 }
 
-function ProfileView({ data, toast }: { data: { email: string; full_name: string; phone: string | null }; toast: ReturnType<typeof useToast>["toast"] }) {
+function ProfileView({ data, toast }: { data: { email: string; full_name: string; phone: string | null; avatar_url?: string | null }; toast: ReturnType<typeof useToast>["toast"] }) {
   const [fullName, setFullName] = useState(data.full_name || "");
   const [phone, setPhone] = useState(data.phone || "");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(data.avatar_url ?? null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadAvatar(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast("فقط فایل تصویری مجاز است.", "error");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast("حجم تصویر باید کمتر از ۲ مگابایت باشد.", "error");
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiFetch("/users/me/avatar", {
+        method: "POST",
+        headers: authHeaders(),
+        body: fd,
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.detail || "آپلود ناموفق");
+      const newUrl = j.avatar_url as string;
+      setAvatarUrl(newUrl);
+      toast("عکس پروفایل به‌روز شد.", "success");
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
+
+  async function removeAvatar() {
+    if (!avatarUrl) return;
+    setAvatarUploading(true);
+    try {
+      const res = await apiFetch("/users/me/avatar", { method: "DELETE", headers: authHeaders() });
+      if (!res.ok) throw new Error("حذف ناموفق");
+      setAvatarUrl(null);
+      toast("عکس پروفایل حذف شد.", "success");
+    } catch (err) {
+      toast(getErrorMessage(err), "error");
+    } finally {
+      setAvatarUploading(false);
+    }
+  }
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -147,8 +195,59 @@ function ProfileView({ data, toast }: { data: { email: string; full_name: string
       setSaving(false);
     }
   }
+  const avatarLetter = (fullName || data.email || "?")[0]?.toUpperCase() ?? "?";
+
   return (
     <div className="mt-6 space-y-6">
+      <div className="rounded-2xl bg-surface p-6 shadow-shelf dark:bg-black/25">
+        <p className="text-sm font-bold">عکس پروفایل (اختیاری)</p>
+        <div className="mt-3 flex items-center gap-4">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-char/10 bg-lajvard/10 dark:border-white/10 dark:bg-lajvard-soft/15">
+            {avatarUrl ? (
+              <Image src={mediaUrl(avatarUrl)} alt="آواتار" fill sizes="80px" className="object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-xl font-extrabold text-lajvard dark:text-lajvard-soft">
+                {avatarLetter}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={avatarUploading}
+                className="min-h-[40px] rounded-xl bg-lajvard px-4 text-sm text-white disabled:opacity-50 dark:bg-lajvard-soft dark:text-char"
+              >
+                {avatarUploading ? "در حال آپلود…" : avatarUrl ? "تغییر عکس" : "انتخاب عکس"}
+              </button>
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={() => void removeAvatar()}
+                  disabled={avatarUploading}
+                  className="min-h-[40px] rounded-xl border border-char/20 px-4 text-sm text-clay hover:bg-clay/10 disabled:opacity-50 dark:border-white/20"
+                >
+                  حذف
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-char-soft">JPG، PNG یا WebP — حداکثر ۲ مگابایت</p>
+          </div>
+        </div>
+        <input
+          ref={avatarInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void uploadAvatar(file);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
       <div className="rounded-2xl bg-surface p-6 shadow-shelf dark:bg-black/25">
         <p className="text-sm text-char-soft">ایمیل</p>
         <p className="font-medium" dir="ltr">{data.email}</p>

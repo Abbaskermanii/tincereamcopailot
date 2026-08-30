@@ -27,6 +27,9 @@ interface Article {
   body: string;
   published_at: string;
   cover_image_url?: string | null;
+  cover_url?: string | null;
+  author_name?: string | null;
+  author_avatar_url?: string | null;
   categories?: Category[];
   tags?: { id: string; name: string; slug: string }[];
 }
@@ -111,10 +114,27 @@ export default function ArticlePage({ params }: Props) {
               </div>
             </div>
 
+            {/* Author card with avatar fallback */}
+            {(article.author_name || article.author_avatar_url) && (
+              <div className="mb-6 flex items-center gap-3 rounded-2xl bg-surface p-4 shadow-shelf dark:bg-black/25">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lajvard/10 text-sm font-bold text-lajvard dark:bg-lajvard-soft/15 dark:text-lajvard-soft">
+                  {article.author_avatar_url ? (
+                    <img src={mediaUrl(article.author_avatar_url)} alt={article.author_name ?? "نویسنده"} className="h-full w-full object-cover" />
+                  ) : (
+                    (article.author_name || "?")[0]?.toUpperCase()
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-bold">{article.author_name ?? "نویسنده"}</p>
+                  <p className="text-xs text-char-soft dark:text-ink-soft">نویسندهٔ مقاله</p>
+                </div>
+              </div>
+            )}
+
             {/* Cover image */}
-            {article.cover_image_url && (
+            {(article.cover_image_url || article.cover_url) && (
               <img
-                src={mediaUrl(article.cover_image_url)}
+                src={mediaUrl(article.cover_image_url ?? article.cover_url ?? "")}
                 alt={article.title}
                 className="w-full h-64 md:h-80 object-cover rounded-t-lg mb-6"
               />

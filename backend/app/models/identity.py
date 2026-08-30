@@ -43,6 +43,7 @@ class User(UUIDMixin, TimestampMixin, table=True):
     password_hash: str = Field(default="", max_length=255)
     full_name: str = Field(default="", max_length=255)
     phone: str | None = Field(default=None, max_length=20, index=True)
+    avatar_url: str | None = Field(default=None, max_length=512)
     is_active: bool = Field(default=True, index=True)
     is_admin: bool = Field(default=False, index=True)
     role_id: str | None = Field(default=None, foreign_key="roles.id")
