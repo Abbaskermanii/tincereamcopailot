@@ -60,7 +60,6 @@ const NAV: NavGroup[] = [
       { label: "نظرات", href: "/admin/reviews", icon: Star },
       { label: "پرسش‌ها", href: "/admin/questions", icon: MessageSquare },
       { label: "پیام‌ها", href: "/admin/messages", icon: MessageSquare },
-      { label: "خبرنامه", href: "/admin/newsletter", icon: Megaphone },
     ],
   },
   {

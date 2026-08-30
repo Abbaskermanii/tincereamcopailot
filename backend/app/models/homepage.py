@@ -16,7 +16,6 @@ class HomepageSectionKind(str, enum.Enum):
     categories = "categories"  # category cards grid
     articles = "articles"      # latest article teasers
     faq = "faq"                # FAQ accordion
-    newsletter = "newsletter"  # newsletter signup band
 
 
 class ProductSource(str, enum.Enum):

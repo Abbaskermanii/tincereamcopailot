@@ -225,5 +225,4 @@ def default_sections() -> list[HomepageSection]:
         HomepageSection(kind=HomepageSectionKind.products, title="پیشنهاد ویژه", source=ProductSource.discounted, sort_order=40, limit_count=8),
         HomepageSection(kind=HomepageSectionKind.articles, title="از مجله تن‌سِرام", sort_order=50, limit_count=4),
         HomepageSection(kind=HomepageSectionKind.faq, title="سوالات رایج", sort_order=60, limit_count=5),
-        HomepageSection(kind=HomepageSectionKind.newsletter, title="خبرنامه", sort_order=70),
     ]

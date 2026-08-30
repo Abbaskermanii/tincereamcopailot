@@ -5,7 +5,7 @@ Uses real DB (TEST_DATABASE_URL), real auth, real validation.
 No mocks except ZarinPal gateway (already mocked in conftest) and SMS/email.
 
 Groups:
- health/system, auth, users, catalog/categories/brands/products/variants/media/cart/orders/payments/coupons/wishlist/reviews/questions/stock-notify/pages/faq/contact/newsletter/articles/homepage/carousels/shipping/notifications/feeds/admin(55+)/roles/settings/activity
+ health/system, auth, users, catalog/categories/brands/products/variants/media/cart/orders/payments/coupons/wishlist/reviews/questions/stock-notify/pages/faq/contact/articles/homepage/carousels/shipping/notifications/feeds/admin(55+)/roles/settings/activity
 """
 
 import asyncio
@@ -528,12 +528,6 @@ class TestCommunity:
         assert r.status_code == 201
         r = await client.post("/api/v1/contact", json={"name": "a", "message": "short"})
         assert r.status_code == 422
-        # newsletter
-        email = _unique("nl") + "@example.com"
-        r = await client.post(f"/api/v1/newsletter?email={email}")
-        assert r.status_code == 200
-        r = await client.delete(f"/api/v1/newsletter/{email}")
-        assert r.status_code == 200
 
     async def test_articles(self, client):
         r = await client.get("/api/v1/articles")
@@ -916,8 +910,6 @@ class TestAdmin:
         r = await c.get("/api/v1/admin/coupon-redemptions", headers=h)
         assert r.status_code == 200
         r = await c.get("/api/v1/admin/messages", headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/newsletter", headers=h)
         assert r.status_code == 200
         r = await c.get("/api/v1/admin/notifications", headers=h)
         assert r.status_code == 200

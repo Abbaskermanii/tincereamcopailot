@@ -29,7 +29,6 @@ const KIND_LABELS: Record<string, string> = {
   categories: "کارت دسته‌بندی‌ها",
   articles: "مقالات وبلاگ",
   faq: "سوالات رایج",
-  newsletter: "خبرنامه",
 };
 
 const SOURCE_LABELS: Record<string, string> = {

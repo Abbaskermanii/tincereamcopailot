@@ -3,7 +3,6 @@ import { ProductSection } from "@/components/store/product-section";
 import { CategorySection } from "@/components/store/category-section";
 import { ArticleSection } from "@/components/store/article-section";
 import { FAQSection } from "@/components/store/faq-section";
-import { NewsletterBand } from "@/components/store/newsletter-band";
 import { HomeCarousel } from "@/components/store/home-carousel";
 
 export const revalidate = 120;
@@ -60,9 +59,6 @@ export default async function HomePage() {
           }
           if (sec.kind === "faq" && sec.faq) {
             return <FAQSection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} faq_items={sec.faq as FaqItem[]} limit={5} />;
-          }
-          if (sec.kind === "newsletter") {
-            return <NewsletterBand key={sec.id} />;
           }
           return null;
         })}
@@ -176,8 +172,6 @@ export default async function HomePage() {
         faq_items={fallbackAllFaq}
         limit={4}
       />
-
-      <NewsletterBand />
     </div>
   );
 }

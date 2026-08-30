@@ -58,8 +58,4 @@ class ActivityLog(UUIDMixin, TimestampMixin, table=True):
     entity_id: str | None = None
     metadata_json: str = "{}"
 
-class NewsletterSubscription(UUIDMixin, TimestampMixin, table=True):
-    __tablename__ = "newsletter_subscriptions"
-    email: str = Field(max_length=255, unique=True, index=True)
-    consent: bool = True
-    unsubscribed_at: datetime | None = None
+

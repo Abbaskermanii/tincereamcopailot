@@ -30,7 +30,6 @@ from app.models import (
     FAQItem,
     HomepageSection,
     HomepageSectionKind,
-    NewsletterSubscription,
     Notification,
     Order,
     OrderItem,
@@ -788,7 +787,7 @@ def all_notifications(_: None = _require_perm("settings"), session: Session = De
     return session.exec(select(Notification).order_by(Notification.created_at.desc()).limit(limit)).all()  # type: ignore[arg-type]
 
 
-# ============================ Contact messages & newsletter ============================
+# ============================ Contact messages ============================
 
 @admin.get("/messages")
 def contact_messages(_: None = _require_perm("messages"), session: Session = Depends(get_session)):
@@ -830,21 +829,6 @@ def delete_message(message_id: str, user: User = Depends(require_permission("mes
     row = session.get(ContactMessage, message_id)
     if not row:
         raise HTTPException(404, "پیام یافت نشد.")
-    session.delete(row)
-    session.commit()
-    return {"ok": True}
-
-
-@admin.get("/newsletter")
-def newsletter_list(_: None = _require_perm("messages"), session: Session = Depends(get_session)):
-    return session.exec(select(NewsletterSubscription).order_by(NewsletterSubscription.created_at.desc())).all()  # type: ignore[arg-type]
-
-
-@admin.delete("/newsletter/{subscription_id}")
-def newsletter_delete(subscription_id: str, user: User = Depends(require_permission("messages")), session: Session = Depends(get_session)):
-    row = session.get(NewsletterSubscription, subscription_id)
-    if not row:
-        raise HTTPException(404, "عضویت یافت نشد.")
     session.delete(row)
     session.commit()
     return {"ok": True}

@@ -397,19 +397,6 @@ def get_setting(key: str, s: Session = Depends(get_session)):
     try: return {"key":key,"value":json.loads(row.value)}
     except Exception: return {"key":key,"value":row.value}
 
-@public.post("/newsletter")
-def newsletter(email: str, s: Session = Depends(get_session)):
-    row=s.exec(select(NewsletterSubscription).where(NewsletterSubscription.email==email.lower())).first()
-    if row: row.unsubscribed_at=None; row.consent=True
-    else: row=NewsletterSubscription(email=email.lower())
-    s.add(row); s.commit(); return {"ok":True}
-
-@public.delete("/newsletter/{email}")
-def unsubscribe(email: str, s: Session = Depends(get_session)):
-    row=s.exec(select(NewsletterSubscription).where(NewsletterSubscription.email==email.lower())).first()
-    if row: row.unsubscribed_at=datetime.now(UTC); s.add(row); s.commit()
-    return {"ok":True}
-
 @public.get("/shipping-methods")
 def public_shipping_methods(s: Session = Depends(get_session)):
     """Active shipping methods for storefront checkout (no auth required)."""
