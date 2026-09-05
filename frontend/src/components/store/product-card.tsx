@@ -16,6 +16,8 @@ interface ProductCardProps {
   image?: string | null;
   category?: string;
   stock_qty?: number;
+  /** @deprecated kept for backward compat, no longer used */
+  compact?: boolean;
   isOnWishlist?: boolean;
   wishlistAction?: () => void;
 }
