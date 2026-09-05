@@ -7,7 +7,7 @@ export interface AuthUser {
   id: string;
   email: string;
   full_name: string;
-  phone: string | null;
+  profile_image?: string | null;
   is_admin: boolean;
   is_active: boolean;
   role_id: string | null;

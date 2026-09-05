@@ -12,6 +12,7 @@ from app.core.permissions import ROLE_PRESETS
 from app.core.security import hash_password
 from app.core.config import get_settings
 from app.models import (
+    Carousel,
     Category,
     Coupon,
     DiscountType,
@@ -89,6 +90,36 @@ def seed(session: Session) -> None:
         dtype = payload.pop("discount_type")
         session.add(Coupon(discount_type=DiscountType(dtype), **payload))
 
+    for cs in rows.get("carousels", []):
+        original_url = cs["image_url"]
+        exists = session.exec(
+            select(Carousel).where(Carousel.image_url == original_url)  # type: ignore[arg-type]
+        ).first()
+        if exists:
+            continue
+        if original_url.startswith("/carousel/"):
+            object_name = f"seed/{original_url.rsplit('/', 1)[-1]}"
+            svg = (
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500">'
+                '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+                '<stop offset="0%" stop-color="#31547A"/><stop offset="100%" stop-color="#7A9E93"/>'
+                '</linearGradient></defs>'
+                '<rect width="1200" height="500" fill="url(#g)"/>'
+                '<circle cx="600" cy="250" r="120" fill="#EDEAE3" opacity="0.3"/>'
+                '<text x="600" y="260" text-anchor="middle" font-family="sans-serif" font-size="36" fill="white" opacity="0.8">Tinceram</text>'
+                "</svg>"
+            ).encode()
+            image_url = put_image(object_name, svg, "image/svg+xml")
+        else:
+            image_url = original_url
+        session.add(Carousel(
+            title=cs["title"],
+            subtitle=cs.get("subtitle"),
+            image_url=image_url,
+            link_url=cs.get("link_url"),
+            sort_order=cs.get("sort_order", 0),
+        ))
+
     _seed_ops_data(session)
     session.commit()
 
@@ -155,13 +186,13 @@ def _seed_ops_data(session: Session) -> None:
         ("هزینه ارسال چقدر است؟", "هزینه ارسال به روش ارسال انتخابی بستگی دارد و در صفحه پرداخت نمایش داده می‌شود.", "ارسال", 3),
         ("آیا محصولات دست‌ساز هستند؟", "بله، تمام محصولات تن‌سِرام به‌صورت دستی ساخته و لعاب‌کاری می‌شوند.", "محصولات", 4),
     ]
-    existing_faqs = session.exec(select(func.count()).select_from(FAQItem)).one()
+    existing_faqs = session.exec(select(func.count()).select_from(FAQItem.__table__)).one()
     if not existing_faqs:
         for q, a, cat, order in faqs:
             session.add(FAQItem(question=q, answer=a, category=cat, sort_order=order))
 
     # homepage layout (only on first run)
-    existing_sections = session.exec(select(func.count()).select_from(HomepageSection)).one()
+    existing_sections = session.exec(select(func.count()).select_from(HomepageSection.__table__)).one()
     if not existing_sections:
         from app.services.homepage import default_sections
         for section in default_sections():
@@ -169,8 +200,8 @@ def _seed_ops_data(session: Session) -> None:
 
 
 def is_seeded(session: Session) -> bool:
-    count = session.exec(select(func.count()).select_from(Product)).one()
-    return bool(count)
+    result = session.exec(select(Product).limit(1)).one_or_none()
+    return result is not None
 
 
 if __name__ == "__main__":

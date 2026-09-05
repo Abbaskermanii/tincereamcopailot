@@ -1,4 +1,4 @@
-# Web framework
+﻿# Web framework
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 gunicorn==23.0.0
@@ -23,7 +23,7 @@ email-validator==2.2.0
 
 # Authentication / password hashing
 passlib[bcrypt]==1.7.4
-bcrypt==4.2.1
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 
 # HTTP client (ZarinPal + tests)

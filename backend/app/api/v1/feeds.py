@@ -1,6 +1,7 @@
 """XML product feeds: Torob & Google Merchant Center (same source data)."""
 
-from datetime import UTC, datetime
+from datetime import datetime
+from app.compat import UTC
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, Response

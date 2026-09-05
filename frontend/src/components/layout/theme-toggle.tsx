@@ -1,27 +1,55 @@
 "use client";
 
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme, systemTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [isDark, setIsDark] = useState(false);
 
-  if (!mounted) {
-    return <span className="inline-flex h-10 w-10" aria-hidden />;
-  }
+  useEffect(() => {
+    setMounted(true);
+    setIsDark(theme === "dark" || (!theme && systemTheme === "dark"));
+  }, [theme, systemTheme]);
 
-  const isDark = resolvedTheme === "dark";
+  const toggleTheme = () => {
+    const newTheme = isDark ? "light" : "dark";
+    setTheme(newTheme);
+    setIsDark(!isDark);
+    localStorage.setItem("theme", newTheme);
+  };
+
   return (
     <button
       type="button"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label={isDark ? "حالت روشن" : "حالت تاریک"}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-char-soft transition-colors hover:bg-char/5 dark:text-ink-soft dark:hover:bg-white/10"
+      onClick={toggleTheme}
+      aria-label={mounted ? (isDark ? "Switch to light mode" : "Switch to dark mode") : "Toggle theme"}
+      className="
+        flex
+        h-9
+        w-9
+        shrink-0
+        items-center
+        justify-center
+        rounded-lg
+        text-char-soft
+        transition-colors
+        hover:bg-char/5
+        hover:text-char
+        dark:hover:bg-white/5
+        dark:hover:text-white
+      "
     >
-      {isDark ? <Sun size={19} /> : <Moon size={19} />}
+      <Sun
+        className="absolute h-5 w-5 transition-all duration-300 rotate-0 scale-100 dark:-rotate-90 dark:scale-0"
+        strokeWidth={1.8}
+      />
+      <Moon
+        className="absolute h-5 w-5 transition-all duration-300 rotate-90 scale-0 dark:rotate-0 dark:scale-100"
+        strokeWidth={1.8}
+      />
     </button>
   );
 }

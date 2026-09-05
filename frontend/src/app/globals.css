@@ -21,6 +21,12 @@
   --brand: var(--lajvard);
   --accent: var(--firouzeh);
   --warm: var(--kiln-clay);
+
+  /* Refined shadow tokens */
+  --shadow-xs: 0 1px 2px rgba(38,34,31,.04);
+  --shadow-sm: 0 1px 3px rgba(38,34,31,.06), 0 4px 12px rgba(38,34,31,.05);
+  --shadow-md: 0 2px 4px rgba(38,34,31,.06), 0 8px 24px rgba(38,34,31,.08);
+  --shadow-lg: 0 4px 8px rgba(38,34,31,.06), 0 16px 40px rgba(38,34,31,.1);
 }
 
 .dark {
@@ -31,12 +37,16 @@
   --brand: #8fb2d9;
   --accent: #93b8ac;
   --warm: #cf9270;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.15);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.2), 0 4px 12px rgba(0,0,0,.12);
+  --shadow-md: 0 2px 4px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.15);
+  --shadow-lg: 0 4px 8px rgba(0,0,0,.2), 0 16px 40px rgba(0,0,0,.2);
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
-    /* Focus Not Obscured (WCAG 2.2) — keep :focus above sticky header + sticky buy bar */
     scroll-padding-top: 6rem;
     scroll-padding-bottom: 5rem;
   }
@@ -45,6 +55,8 @@
     color: var(--ink);
     font-feature-settings: "ss01";
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
   ::selection {
     background: color-mix(in srgb, var(--accent) 45%, transparent);
@@ -69,7 +81,7 @@
 }
 
 @layer components {
-  /* ——— «لبهٔ لعاب» the Glaze Edge: hand-thrown wobbly rim + settling sheen ——— */
+  /* Glaze Edge — hand-thrown wobbly rim + settling sheen */
   .glaze-edge {
     border-radius: 255px 18px 225px 18px / 18px 225px 18px 255px;
     position: relative;
@@ -149,4 +161,14 @@
 }
 .no-scrollbar {
   scrollbar-width: none;
+}
+
+/* Smooth scroll snap for carousels */
+@supports (scroll-snap-type: x mandatory) {
+  .snap-x {
+    scroll-snap-type: x mandatory;
+  }
+  .snap-start {
+    scroll-snap-align: start;
+  }
 }

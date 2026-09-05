@@ -1,6 +1,7 @@
 """Lightweight admin stats endpoint (HTTP Basic against env credentials)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from app.compat import UTC
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text

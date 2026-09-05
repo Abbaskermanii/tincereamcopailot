@@ -6,7 +6,9 @@ introduced with the admin-panel revamp and is the surface the new UI uses.
 
 import json
 import secrets
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+
+from app.compat import UTC
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
@@ -20,6 +22,8 @@ from app.models import (
     ActivityLog,
     Article,
     ArticleCategory,
+    Attribute,
+    AttributeValue,
     Brand,
     Campaign,
     Category,
@@ -30,7 +34,6 @@ from app.models import (
     FAQItem,
     HomepageSection,
     HomepageSectionKind,
-    NewsletterSubscription,
     Notification,
     Order,
     OrderItem,
@@ -835,21 +838,6 @@ def delete_message(message_id: str, user: User = Depends(require_permission("mes
     return {"ok": True}
 
 
-@admin.get("/newsletter")
-def newsletter_list(_: None = _require_perm("messages"), session: Session = Depends(get_session)):
-    return session.exec(select(NewsletterSubscription).order_by(NewsletterSubscription.created_at.desc())).all()  # type: ignore[arg-type]
-
-
-@admin.delete("/newsletter/{subscription_id}")
-def newsletter_delete(subscription_id: str, user: User = Depends(require_permission("messages")), session: Session = Depends(get_session)):
-    row = session.get(NewsletterSubscription, subscription_id)
-    if not row:
-        raise HTTPException(404, "عضویت یافت نشد.")
-    session.delete(row)
-    session.commit()
-    return {"ok": True}
-
-
 @admin.get("/coupon-redemptions")
 def coupon_redemptions(coupon_id: str | None = None, _: None = _require_perm("coupons"), session: Session = Depends(get_session)):
     filters = []
@@ -1143,17 +1131,40 @@ ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "w
 async def upload_media(file: UploadFile = File(...), user: User = Depends(admin_user), session: Session = Depends(get_session)):
     """Upload any admin image (brand logo, category, article cover, carousel, …)
     and return its URL. Product images keep their dedicated endpoint."""
+    from app.core.config import get_settings as _gs
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود (JPG، PNG یا WebP).")
     data = await file.read()
-    if len(data) > 5 * 1024 * 1024:
-        raise HTTPException(413, "حجم تصویر باید کمتر از ۵ مگابایت باشد.")
+    max_bytes = _gs().max_upload_size_mb * 1024 * 1024
+    if len(data) > max_bytes:
+        raise HTTPException(413, f"حجم تصویر باید کمتر از {_gs().max_upload_size_mb} مگابایت باشد.")
     extension = ALLOWED_IMAGE_TYPES[content_type]
     object_name = f"uploads/{datetime.now(UTC):%Y/%m}/{secrets.token_hex(12)}.{extension}"
     url = put_image(object_name, data, content_type)
     log_activity(session, actor_id=user.id, action="upload", entity_type="media", metadata={"object": object_name})
     session.commit()
+    return {"url": url, "object_name": object_name}
+
+
+@admin.post("/avatar/upload", status_code=201)
+async def upload_avatar(file: UploadFile = File(...), user: User = Depends(admin_user), session: Session = Depends(get_session)):
+    """Upload user avatar image (configurable max size, image only). Updates user.avatar_url."""
+    from app.core.config import get_settings as _gs
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(415, "فرمت تصویر پشتیبانی نمی‌شود (JPG، PNG یا WebP).")
+    data = await file.read()
+    max_bytes = _gs().max_avatar_size_mb * 1024 * 1024
+    if len(data) > max_bytes:
+        raise HTTPException(413, f"حجم تصویر باید کمتر از {_gs().max_avatar_size_mb} مگابایت باشد.")
+    extension = ALLOWED_IMAGE_TYPES[content_type]
+    object_name = f"avatars/{user.id}/{secrets.token_hex(12)}.{extension}"
+    url = put_image(object_name, data, content_type)
+    user.avatar_url = url
+    session.add(user)
+    session.commit()
+    log_activity(session, actor_id=user.id, action="upload", entity_type="media", metadata={"object": object_name})
     return {"url": url, "object_name": object_name}
 
 
@@ -1172,6 +1183,7 @@ SETTING_DEFINITIONS: list[dict] = [
     {"key": "seo_default_description", "group": "seo", "label": "توضیح پیش‌فرض", "type": "text", "default": ""},
     {"key": "tax_rate_percent", "group": "store", "label": "مالیات (٪)", "type": "number", "default": "0"},
     {"key": "shipping_note", "group": "store", "label": "یادداشت ارسال", "type": "text", "default": ""},
+    {"key": "gift_fee", "group": "store", "label": "هزینه بسته‌بندی هدیه", "type": "number", "default": "30000"},
 ]
 SETTING_GROUPS = [
     {"key": "general", "label": "عمومی"},
@@ -1316,3 +1328,259 @@ def admin_orders_v2(
         for o in rows
     ]
     return {"total": total, "items": items}
+
+
+# ============================ Attributes & Product Specs ============================
+
+
+class AttributeIn(BaseModel):
+    name: str = Field(max_length=64)
+    slug: str = Field(max_length=64)
+    description: str | None = None
+    attr_type: str = Field(default="other", max_length=32)
+    is_filterable: bool = False
+    sort_order: int = 0
+
+
+class AttributeValueIn(BaseModel):
+    attribute_id: str
+    value: str = Field(max_length=128)
+    slug: str = Field(max_length=128)
+    swatch_image_url: str | None = None
+    sort_order: int = 0
+
+
+class ProductSpecIn(BaseModel):
+    attribute_id: str
+    attribute_value_id: str
+    custom_value: str | None = None
+    sort_order: int = 0
+
+
+@admin.get("/attributes")
+def list_attributes(_: None = _require_perm("products"), session: Session = Depends(get_session)):
+    rows = session.exec(select(Attribute).order_by(Attribute.sort_order)).all()  # type: ignore[arg-type]
+    result = []
+    for a in rows:
+        vals = session.exec(
+            select(AttributeValue).where(AttributeValue.attribute_id == a.id).order_by(AttributeValue.sort_order)  # type: ignore[arg-type]
+        ).all()
+        result.append({
+            "id": a.id, "name": a.name, "slug": a.slug, "description": a.description,
+            "attr_type": a.attr_type, "is_filterable": a.is_filterable, "sort_order": a.sort_order,
+            "values": [{"id": v.id, "value": v.value, "slug": v.slug, "swatch_image_url": v.swatch_image_url, "sort_order": v.sort_order} for v in vals],
+        })
+    return result
+
+
+@admin.post("/attributes", status_code=201)
+def create_attribute(payload: AttributeIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    existing = session.exec(select(Attribute).where(Attribute.slug == payload.slug)).first()  # type: ignore[arg-type]
+    if existing:
+        raise HTTPException(400, "Slug تکراری است.")
+    row = Attribute(**payload.model_dump())
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="create", entity_type="attribute", entity_id=row.id, metadata={"name": row.name})
+    session.commit()
+    session.refresh(row)
+    return {"id": row.id, "name": row.name, "slug": row.slug}
+
+
+@admin.patch("/attributes/{attribute_id}")
+def update_attribute(attribute_id: str, payload: AttributeIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    row = session.get(Attribute, attribute_id)
+    if not row:
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(row, k, v)
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="update", entity_type="attribute", entity_id=row.id)
+    session.commit()
+    return {"ok": True}
+
+
+@admin.delete("/attributes/{attribute_id}")
+def delete_attribute(attribute_id: str, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    row = session.get(Attribute, attribute_id)
+    if not row:
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    session.delete(row)
+    log_activity(session, actor_id=user.id, action="delete", entity_type="attribute", entity_id=attribute_id)
+    session.commit()
+    return {"ok": True}
+
+
+@admin.post("/attribute-values", status_code=201)
+def create_attribute_value(payload: AttributeValueIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    attr = session.get(Attribute, payload.attribute_id)
+    if not attr:
+        raise HTTPException(404, "ویژگی یافت نشد.")
+    existing = session.exec(select(AttributeValue).where(AttributeValue.slug == payload.slug)).first()  # type: ignore[arg-type]
+    if existing:
+        raise HTTPException(400, "Slug تکراری است.")
+    row = AttributeValue(**payload.model_dump())
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="create", entity_type="attribute_value", entity_id=row.id)
+    session.commit()
+    session.refresh(row)
+    return {"id": row.id, "value": row.value, "slug": row.slug}
+
+
+@admin.delete("/attribute-values/{value_id}")
+def delete_attribute_value(value_id: str, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    row = session.get(AttributeValue, value_id)
+    if not row:
+        raise HTTPException(404, "مقدار ویژگی یافت نشد.")
+    session.delete(row)
+    log_activity(session, actor_id=user.id, action="delete", entity_type="attribute_value", entity_id=value_id)
+    session.commit()
+    return {"ok": True}
+
+
+@admin.get("/products/{product_id}/specs")
+def list_product_specs(product_id: str, _: None = _require_perm("products"), session: Session = Depends(get_session)):
+    from app.models import ProductAttributeValue
+    rows = session.exec(
+        select(ProductAttributeValue).where(ProductAttributeValue.product_id == product_id).order_by(ProductAttributeValue.sort_order)  # type: ignore[arg-type]
+    ).all()
+    result = []
+    for ps in rows:
+        attr = session.get(Attribute, ps.attribute_id)
+        val = session.get(AttributeValue, ps.attribute_value_id)
+        result.append({
+            "id": ps.id,
+            "attribute_id": ps.attribute_id,
+            "attribute_name": attr.name if attr else None,
+            "attribute_value_id": ps.attribute_value_id,
+            "attribute_value": val.value if val else None,
+            "custom_value": ps.custom_value,
+            "sort_order": ps.sort_order,
+        })
+    return result
+
+
+@admin.put("/products/{product_id}/specs")
+def set_product_specs(product_id: str, specs: list[ProductSpecIn], user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
+    from app.models import ProductAttributeValue
+    product = session.get(Product, product_id)
+    if not product:
+        raise HTTPException(404, "محصول یافت نشد.")
+    for existing in session.exec(select(ProductAttributeValue).where(ProductAttributeValue.product_id == product_id)).all():
+        session.delete(existing)
+    for idx, spec in enumerate(specs):
+        session.add(ProductAttributeValue(
+            product_id=product_id,
+            attribute_id=spec.attribute_id,
+            attribute_value_id=spec.attribute_value_id,
+            custom_value=spec.custom_value,
+            sort_order=spec.sort_order or idx * 10,
+        ))
+    log_activity(session, actor_id=user.id, action="update", entity_type="product_specs", entity_id=product_id, metadata={"count": len(specs)})
+    session.commit()
+    cache_delete_pattern(f"products:*")
+    return {"ok": True, "count": len(specs)}
+
+
+# ============================ Newsletter admin ============================
+
+
+@admin.get("/newsletter")
+def list_newsletter_subscribers(
+    _: None = _require_perm("content"),
+    session: Session = Depends(get_session),
+    offset: int = 0,
+    limit: int = Query(50, le=200),
+):
+    from app.models import NewsletterSubscription
+    total = int(session.exec(select(func.count(NewsletterSubscription.id))).one() or 0)  # type: ignore[arg-type]
+    rows = session.exec(
+        select(NewsletterSubscription).order_by(NewsletterSubscription.created_at.desc()).offset(offset).limit(limit)  # type: ignore[arg-type]
+    ).all()
+    return {
+        "total": total,
+        "items": [
+            {"id": r.id, "email": r.email, "consent": r.consent, "unsubscribed_at": r.unsubscribed_at, "created_at": r.created_at}
+            for r in rows
+        ],
+    }
+
+
+@admin.delete("/newsletter/{email}")
+def admin_unsubscribe(email: str, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
+    from app.models import NewsletterSubscription
+    row = session.exec(select(NewsletterSubscription).where(NewsletterSubscription.email == email)).first()
+    if row:
+        row.unsubscribed_at = datetime.now(UTC)
+        row.consent = False
+        session.add(row)
+        session.commit()
+    return {"ok": True}
+
+
+# ============================ Loyalty Program ============================
+
+
+@admin.get("/loyalty/{user_id}")
+def get_user_loyalty(user_id: str, _: None = _require_perm("users"), session: Session = Depends(get_session)):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "کاربر یافت نشد.")
+    total_points = getattr(user, "loyalty_points", 0) or 0
+    tier = "bronze"
+    for t, threshold in sorted(LOYALTY_TIER_THRESHOLDS.items(), key=lambda x: -x[1]):
+        if total_points >= threshold:
+            tier = t
+            break
+    return {"user_id": user_id, "points": total_points, "tier": tier}
+
+
+LOYALTY_TIER_THRESHOLDS = {
+    "bronze": 0,
+    "silver": 100000,
+    "gold": 500000,
+    "platinum": 2000000,
+}
+
+
+# ============================ Navigation CMS ============================
+
+
+class NavigationItemIn(BaseModel):
+    label: str = Field(max_length=128)
+    url: str = Field(max_length=512)
+    sort_order: int = 0
+    is_active: bool = True
+    open_in_new_tab: bool = False
+
+
+class NavigationMenuIn(BaseModel):
+    location: str = Field(max_length=32)  # header, footer_main, footer_help, social
+    items: list[NavigationItemIn] = []
+
+
+@admin.get("/navigation/{location}")
+def get_navigation(location: str, _: None = _require_perm("content"), session: Session = Depends(get_session)):
+    row = session.exec(select(Setting).where(Setting.key == f"nav_{location}")).first()  # type: ignore[arg-type]
+    if not row:
+        return {"location": location, "items": []}
+    try:
+        items = json.loads(row.value)
+    except Exception:
+        items = []
+    return {"location": location, "items": items}
+
+
+@admin.put("/navigation/{location}")
+def set_navigation(location: str, payload: NavigationMenuIn, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
+    key = f"nav_{location}"
+    items = [item.model_dump() for item in payload.items]
+    row = session.exec(select(Setting).where(Setting.key == key)).first()  # type: ignore[arg-type]
+    if row:
+        row.value = json.dumps(items, ensure_ascii=False)
+    else:
+        row = Setting(key=key, value=json.dumps(items, ensure_ascii=False), value_type="json")
+    session.add(row)
+    log_activity(session, actor_id=user.id, action="update", entity_type="navigation", metadata={"location": location})
+    session.commit()
+    cache_delete_pattern("settings:*")
+    return {"ok": True, "count": len(items)}

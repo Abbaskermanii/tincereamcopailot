@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { api } from "@/lib/api";
-import { ProductCard } from "@/components/store/product-card";
 import { Breadcrumbs } from "@/components/ui/breadcrumbs";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ShopProductGrid } from "@/components/store/shop-product-grid";
 
 export const revalidate = 120;
 
@@ -136,11 +136,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
             title={`${new Intl.NumberFormat("fa-IR").format(data.total)} کالا`}
             subtitle={`صفحهٔ ${new Intl.NumberFormat("fa-IR").format(data.page)} از ${new Intl.NumberFormat("fa-IR").format(Math.max(data.pages, 1))}`}
           />
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {data.items.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
+          <ShopProductGrid items={data.items} />
 
           {data.pages > 1 && (
             <nav aria-label="صفحه‌بندی" className="mt-10 flex justify-center gap-2">

@@ -2,10 +2,11 @@ export const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, "");
 export function mediaUrl(path: string | null | undefined): string {
   if (!path) return "";
   if (/^https?:\/\//.test(path)) return path;
-  return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
 }
 /** Server-side fetches go through the docker network when available. */
 const INTERNAL_API_URL = process.env.INTERNAL_API_URL;
@@ -133,8 +134,9 @@ export const api = {
         variants: ProductVariant[];
       }
     >(`/products/${slug}`),
-  articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string }>>("/articles", 180),
-  article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string }>(`/articles/${slug}`, 300),
+  articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>>("/articles", 180),
+  article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>(`/articles/${slug}`, 300),
+  articleCategories: () => get<Array<{ id: string; name: string; slug: string }>>("/article-categories", 300),
   carousels: () =>
     get<Array<{ id: string; title?: string; subtitle?: string | null; image_url: string; link_url?: string | null; sort_order: number; is_active?: boolean }>>(
       "/carousels",
@@ -158,8 +160,8 @@ export const api = {
         products?: ProductListItem[];
         slides?: Array<{ id: string; title: string; subtitle: string | null; image_url: string; link_url: string | null }>;
         categories?: Array<{ id: string; name: string; slug: string; image_url: string | null; product_count: number }>;
-        articles?: Array<{ id: string; title: string; slug: string; excerpt: string; published_at: string }>;
-        faq?: Array<{ id: string; question: string; answer: string }>;
+        articles?: Array<{ id: string; title: string; slug: string; excerpt: string; published_at: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>;
+        faq?: Array<{ id: string; question: string; answer: string; category?: string; sort_order?: number; is_active?: boolean }>;
       }>;
       generated_at: string;
     }>("/homepage", 60),

@@ -1,8 +1,10 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime
 from sqlmodel import Field, SQLModel
+
+from app.compat import UTC
 
 
 def utcnow() -> datetime:

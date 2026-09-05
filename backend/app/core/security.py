@@ -1,7 +1,9 @@
 """Password hashing and JWT helpers shared by authentication features."""
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+
+from app.compat import UTC
 from typing import Any
 
 from jose import JWTError, jwt
@@ -28,6 +30,22 @@ def _access_secret() -> str:
 
 def _refresh_secret() -> str:
     return get_settings().get_refresh_secret()
+
+
+def _previous_access_secrets() -> list[str]:
+    """Return list of previous access secrets still valid for token verification."""
+    raw = get_settings().previous_secret_keys
+    if not raw:
+        return []
+    return [s.strip() for s in raw.split(",") if s.strip()]
+
+
+def _previous_refresh_secrets() -> list[str]:
+    """Return list of previous refresh secrets still valid for token verification."""
+    raw = get_settings().previous_refresh_secret_keys
+    if not raw:
+        return []
+    return [s.strip() for s in raw.split(",") if s.strip()]
 
 
 def create_access_token(
@@ -84,13 +102,12 @@ def decode_token(token: str, *, expected_type: str = "access") -> dict[str, Any]
 
     Access and refresh tokens are signed with different secrets (refresh falls
     back to the access secret when no dedicated refresh secret is configured).
+    Supports secret rotation: current secret is tried first, then previous secrets.
     """
-    # Try the expected secret first, then fall back for backwards compat
-    secrets_to_try: list[str]
     if expected_type == "refresh":
-        secrets_to_try = [_refresh_secret(), _access_secret()]
+        secrets_to_try = [_refresh_secret(), _access_secret()] + _previous_refresh_secrets() + _previous_access_secrets()
     else:
-        secrets_to_try = [_access_secret(), _refresh_secret()]
+        secrets_to_try = [_access_secret(), _refresh_secret()] + _previous_access_secrets() + _previous_refresh_secrets()
 
     last_exc: Exception | None = None
     for secret in secrets_to_try:

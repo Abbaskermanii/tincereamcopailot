@@ -1,6 +1,7 @@
 """Persian seed dataset: 4 categories x 6 products with gallery images."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from app.compat import UTC
 
 # (category_key, category_name_fa, slug, shape)
 CATEGORIES = [
@@ -228,6 +229,30 @@ COUPONS = [
     ("KILN100", "fixed", 100000, 800000, 45, 200),
 ]
 
+CAROUSELS = [
+    {
+        "title": "سفارشی‌سازی ماگ لاجوردی",
+        "subtitle": "هر اثر یکتا و بی‌نظیر، ساخته‌شده با دست در کارگاه تن‌سِرام",
+        "image_url": "/carousel/hero-1.svg",
+        "link_url": "/shop",
+        "sort_order": 0,
+    },
+    {
+        "title": "مجموعه جدید فیروزه‌ای",
+        "subtitle": "renovated artisan collection — تازه از کوره",
+        "image_url": "/carousel/hero-2.svg",
+        "link_url": "/category/ceramic-ashtrays",
+        "sort_order": 1,
+    },
+    {
+        "title": "هدیهٔ ویژه برای علاقه‌مندان سفال",
+        "subtitle": "ست‌های هدیه با بسته‌بندی دست‌ساز",
+        "image_url": "/carousel/hero-3.svg",
+        "link_url": "/category/spice-jars",
+        "sort_order": 2,
+    },
+]
+
 
 def build_rows() -> dict:
     """Build plain-data rows consumed by scripts/seed.py and tests."""
@@ -296,4 +321,5 @@ def build_rows() -> dict:
         "products": products_out,
         "images": images_out,
         "coupons": coupons_out,
+        "carousels": CAROUSELS,
     }

@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, Index
+from sqlalchemy import Column, DateTime, Enum, Index, String
 from sqlmodel import Field, Relationship
 
 from app.models.base import TimestampMixin, UUIDMixin
@@ -49,6 +49,9 @@ class User(UUIDMixin, TimestampMixin, table=True):
     failed_login_attempts: int = Field(default=0)
     locked_until: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
     last_login_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+    avatar_url: str | None = Field(default=None, max_length=512, sa_column=Column("avatar_url", String(512), nullable=True))
+    loyalty_points: int = Field(default=0)
+    loyalty_tier: str = Field(default="bronze", max_length=16)
     addresses: list["Address"] = Relationship(back_populates="user")
 
 

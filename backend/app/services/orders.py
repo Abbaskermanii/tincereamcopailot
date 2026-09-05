@@ -2,7 +2,9 @@
 
 import secrets
 import string
-from datetime import UTC, datetime
+from datetime import datetime, timedelta
+
+from app.compat import UTC
 
 from sqlmodel import Session, select
 
@@ -22,7 +24,19 @@ from app.models import (
 from app.services.zarinpal import ZarinPalError
 
 FALLBACK_SHIPPING_FEE = 55000  # تومان؛ وقتی روش ارسال انتخاب نشده باشد
-GIFT_WRAP_FEE = 30000  # تومان
+DEFAULT_GIFT_WRAP_FEE = 30000  # تومان؛ مقدار پیش‌فرض اگر تنظیمات موجود نباشد
+
+
+def _get_gift_wrap_fee(session: Session) -> float:
+    """Read gift wrap fee from Settings model (admin-configurable)."""
+    try:
+        from app.models import Setting
+        row = session.exec(select(Setting).where(Setting.key == "gift_fee")).first()  # type: ignore[arg-type]
+        if row and row.value not in (None, "", "0"):
+            return float(row.value)
+    except Exception:
+        pass
+    return DEFAULT_GIFT_WRAP_FEE
 
 
 def generate_order_number() -> str:
@@ -82,12 +96,13 @@ def compute_totals(
     shipping_cost: float = 0,
     campaign: Campaign | None = None,
     tax_rate: float = 0,
+    gift_wrap_fee: float = DEFAULT_GIFT_WRAP_FEE,
 ) -> dict:
     discount = coupon.compute_discount(subtotal) if coupon else 0
     campaign_discount = 0
     if campaign:
         campaign_discount = campaign.compute_discount(max(subtotal - discount, 0))
-    gift_fee = GIFT_WRAP_FEE if gift_wrap else 0
+    gift_fee = gift_wrap_fee if gift_wrap else 0
     taxable = max(subtotal - discount - campaign_discount, 0)
     tax_amount = round(taxable * tax_rate) if tax_rate else 0
     return {
@@ -229,15 +244,19 @@ def create_order(
     shipping_cost = shipping_cost_for(session, shipping_method, subtotal)
     # Tax rate from Setting (e.g., 0.09) — 0 if not configured
     tax_rate = 0.0
+    gift_wrap_fee = DEFAULT_GIFT_WRAP_FEE
     try:
         from app.models import Setting
 
         _tax_row = session.exec(select(Setting).where(Setting.key == "tax_rate")).first()  # type: ignore[arg-type]
         if _tax_row and _tax_row.value not in (None, "", "0"):
             tax_rate = float(_tax_row.value)
+        _gift_row = session.exec(select(Setting).where(Setting.key == "gift_fee")).first()  # type: ignore[arg-type]
+        if _gift_row and _gift_row.value not in (None, "", "0"):
+            gift_wrap_fee = float(_gift_row.value)
     except Exception:
         tax_rate = 0.0
-    totals = compute_totals(subtotal, coupon, bool(customer.get("gift_wrap")), shipping_cost, campaign, tax_rate)
+    totals = compute_totals(subtotal, coupon, bool(customer.get("gift_wrap")), shipping_cost, campaign, tax_rate, gift_wrap_fee)
 
     order = Order(
         order_number=generate_order_number(),

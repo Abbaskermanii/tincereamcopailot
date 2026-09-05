@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Gift, Truck } from "lucide-react";
+import { Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,9 +11,9 @@ import { useToast } from "@/components/ui/toast-provider";
 import { useCart } from "@/lib/cart";
 import { type ShippingMethod, mediaUrl } from "@/lib/api";
 import { faPrice } from "@/lib/format";
+import { Gift } from "lucide-react";
 
 const FALLBACK_SHIPPING = 55000;
-const GIFT_FEE = 30000;
 
 export default function CheckoutPage() {
   const { lines, subtotal, variantSelections } = useCart();
@@ -52,6 +52,30 @@ export default function CheckoutPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    async function loadSettings() {
+      try {
+        const { apiFetch } = await import("@/lib/api-client");
+        const res = await apiFetch(`/settings/gift_fee`, { signal: controller.signal } as RequestInit);
+        if (!cancelled && res.ok) {
+          const data = (await res.json()) as { value: number };
+          setGiftFee(data.value);
+        }
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return;
+        /* fallback to FALLBACK_SHIPPING */
+      }
+    }
+    void loadSettings();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, []);
+
+  const [giftFee, setGiftFee] = useState(30000);
   const [taxRate, setTaxRate] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -180,7 +204,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const total = Math.max(subtotal - discount + shippingCost + (giftWrap ? GIFT_FEE : 0) + taxAmount, 0);
+  const total = Math.max(subtotal - discount + shippingCost + (giftWrap ? giftFee : 0) + taxAmount, 0);
 
   return (
     <form onSubmit={submit} className="mx-auto max-w-6xl px-4 py-10 md:px-6">
@@ -343,7 +367,7 @@ export default function CheckoutPage() {
                 <dd>{shippingCost === 0 ? "رایگان" : faPrice(shippingCost)}</dd>
               </div>
               {giftWrap && (
-                <div className="flex justify-between"><dt>بسته‌بندی هدیه</dt><dd>{faPrice(GIFT_FEE)}</dd></div>
+                <div className="flex justify-between"><dt>بسته‌بندی هدیه</dt><dd>{faPrice(giftFee)}</dd></div>
               )}
               <div className="flex justify-between border-t border-char/10 pt-2 text-base font-extrabold dark:border-white/10">
                 <dt>قابل پرداخت</dt>

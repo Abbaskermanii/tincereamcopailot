@@ -19,3 +19,5 @@ export function toPersianDigits(s: string | number): string {
 export function latinDigits(s: string): string {
   return s.replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)));
 }
+
+export const formatPrice = faPrice;

@@ -1,4 +1,5 @@
 from app.models.brand import Brand
+from app.models.attribute import Attribute, AttributeValue, AttributeType, ProductAttributeValue
 from app.models.category import Category
 from app.models.cms import ContactMessage, FAQItem, StaticPage
 from app.models.commerce import (
@@ -53,4 +54,5 @@ __all__ = [
     "RefreshToken", "Role", "User", "WishlistItem",
     "ActivityLog", "Article", "ArticleCategory", "Carousel",
     "NewsletterSubscription", "Notification", "RelatedProduct", "Setting",
+    "Attribute", "AttributeValue", "AttributeType", "ProductAttributeValue",
 ]

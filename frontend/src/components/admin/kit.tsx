@@ -1,8 +1,10 @@
 "use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
+import React, { type ReactNode, useEffect, useCallback, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { faNum } from "@/lib/format";
+import useEmblaCarousel from "embla-carousel-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /* ————————————————— Page header ————————————————— */
 
@@ -476,6 +478,82 @@ export function SkeletonTable({ rows = 5 }: { rows?: number }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ————————————————— Carousel (for admin homepage preview) ————————————————— */
+
+interface CarouselItem {
+  children: ReactNode;
+}
+
+export function Carousel({ children }: { children: ReactNode }) {
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, direction: "rtl" });
+  const [selected, setSelected] = useState(0);
+
+  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setSelected(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    onSelect();
+    return () => emblaApi.off("select", onSelect);
+  }, [emblaApi]);
+
+  return (
+    <div className="relative overflow-hidden rounded-wobble">
+      <div className="overflow-hidden" ref={emblaRef}>
+        <div className="flex">
+          {React.Children.map(children, (child, i) => (
+            <div key={i} className="min-w-0 flex-[0_0_100%]">
+              {child}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {(React.Children.count(children) > 1) && (
+        <>
+          <button
+            aria-label="اسلاید قبلی"
+            onClick={scrollPrev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur hover:bg-black/60"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            aria-label="اسلاید بعدی"
+            onClick={scrollNext}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white backdrop-blur hover:bg-black/60"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+            {Array.from({ length: React.Children.count(children) }).map((_, i) => (
+              <button
+                key={i}
+                aria-label={`رفتن به اسلاید ${i + 1}`}
+                onClick={() => emblaApi?.scrollTo(i)}
+                className={`h-1.5 rounded-full transition-all ${i === selected ? "w-6 bg-white" : "w-1.5 bg-white/60 hover:bg-white/90"}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function CarouselPrevious() { return null; }
+export function CarouselNext() { return null; }
+
+export function CarouselItem({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("basis-1/4 md:basis-1/5 lg:basis-1/6", className)} {...props}>
+      {children}
     </div>
   );
 }

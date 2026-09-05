@@ -1,4 +1,7 @@
+"use client";
+
 import { ProductCard } from "./product-card";
+import { ProductSlider } from "./product-slider";
 import { SectionHeading } from "@/components/ui/section-heading";
 
 type ProductListItem = {
@@ -21,13 +24,23 @@ type ProductSectionProps = {
 export function ProductSection({ title, subtitle, products }: ProductSectionProps) {
   if (products.length === 0) return null;
   return (
-    <section className="py-14" aria-labelledby={`prod-section-new`}>
+    <section className="py-14" aria-labelledby="prod-section">
       <SectionHeading title={title} subtitle={subtitle} />
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <ProductSlider>
         {products.map((p) => (
-          <ProductCard key={p.id} product={p} />
+          <ProductCard
+            key={p.id}
+            id={p.id}
+            name={p.name}
+            slug={p.slug}
+            price={p.price}
+            compare_at_price={p.compare_at_price}
+            image={p.primary_image_url}
+            stock_qty={p.stock_qty}
+            compact
+          />
         ))}
-      </div>
+      </ProductSlider>
     </section>
   );
 }

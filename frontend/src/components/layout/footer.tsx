@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { NewsletterForm } from "./newsletter-form";
 
 const FIXED_COLS = [
   {
@@ -82,6 +83,9 @@ export async function Footer() {
             </ul>
           </nav>
         ))}
+      </div>
+      <div className="mx-auto max-w-7xl border-t border-char/10 px-4 py-8 md:px-6">
+        <NewsletterForm />
       </div>
       <div className="border-t border-char/10 py-5 text-center text-xs text-char-soft dark:border-white/10 dark:text-ink-soft">
         © ۱۴۰۵ کارگاه تن‌سِرام — همهٔ حقوق محفوظ است.

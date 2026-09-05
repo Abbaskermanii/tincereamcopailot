@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.db.session import get_session
@@ -186,7 +187,7 @@ async def list_products(
     if in_stock_only:
         filters.append(Product.stock_qty > 0)
 
-    stmt = select(Product).where(*filters).order_by(sort_col)  # type: ignore[arg-type]
+    stmt = select(Product).options(selectinload(Product.images)).where(*filters).order_by(sort_col)  # type: ignore[arg-type]
     total = session.exec(select(func.count()).select_from(Product).where(*filters)).one()
     items = session.exec(stmt.offset((page - 1) * page_size).limit(page_size)).all()
 
@@ -204,7 +205,7 @@ async def list_products(
 @router.get("/products/{slug}", response_model=ProductDetail)
 async def product_detail(slug: str, session: Session = Depends(get_session)) -> ProductDetail:
     p = session.exec(
-        select(Product).where(Product.slug == slug, Product.is_active == True)  # noqa: E712
+        select(Product).options(selectinload(Product.images)).where(Product.slug == slug, Product.is_active == True)  # noqa: E712
     ).first()
     if not p:
         raise HTTPException(404, "محصول یافت نشد.")

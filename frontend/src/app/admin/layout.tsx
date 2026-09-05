@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import {
   BarChart3, Boxes, ChevronDown, FolderTree, Home, Image as ImageIcon,
   LayoutDashboard, LogOut, Megaphone, Menu, MessageSquare,
-  Package, ReceiptText, RotateCcw, ScrollText, Settings, ShieldCheck,
+  Navigation, Package, ReceiptText, RotateCcw, ScrollText, Settings, ShieldCheck,
   ShoppingBag, Star, Tags, Ticket, Truck, Users, X, HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -41,6 +41,7 @@ const NAV: NavGroup[] = [
       { label: "سوالات رایج", href: "/admin/faq", icon: HelpCircle },
       { label: "صفحات", href: "/admin/pages", icon: ScrollText },
       { label: "بنرهای اسلایدری", href: "/admin/carousels", icon: ImageIcon },
+      { label: "مدیریت منوها", href: "/admin/navigation", icon: Navigation },
     ],
   },
   {
@@ -60,7 +61,6 @@ const NAV: NavGroup[] = [
       { label: "نظرات", href: "/admin/reviews", icon: Star },
       { label: "پرسش‌ها", href: "/admin/questions", icon: MessageSquare },
       { label: "پیام‌ها", href: "/admin/messages", icon: MessageSquare },
-      { label: "خبرنامه", href: "/admin/newsletter", icon: Megaphone },
     ],
   },
   {

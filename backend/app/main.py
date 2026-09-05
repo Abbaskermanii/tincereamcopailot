@@ -1,6 +1,7 @@
 import logging
+from fastapi.responses import JSONResponse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -66,5 +67,34 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Cookie", "X-Requested-With"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger = logging.getLogger("tinceream")
+    logger.error(
+        f"Unhandled exception: {str(exc)}",
+        extra={"path": request.url.path, "method": request.method},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "detail": "An unexpected error occurred",
+            "path": request.url.path,
+        },
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "path": request.url.path,
+        },
+    )
+
 
 app.include_router(api_router, prefix="/api/v1")

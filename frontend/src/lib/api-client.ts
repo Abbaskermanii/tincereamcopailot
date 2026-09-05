@@ -8,21 +8,24 @@ export interface ApiError {
   detail?: unknown;
 }
 
-function getAccessToken(): string | null {
+// --- توکن‌ها فقط از کوکی httponly می‌مونیم (بک‌اند header نشانه ورود احراز شده) ---
+// localStorage.getItem/setItem "access_token"/"refresh_token" حذف شده.
+// Authorization header دستی (Bearer ...) حذف شده — از credentials: "include"
+// در fetch استفاده می‌شه. cookie httponly توسط بک‌اند setted می‌شه.
+
+// --- دریافت refresh token از cookie (method fluent) ---
+function getRefreshTokenFromCookie(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
+  const match = document.cookie.match(/(?:^|; )tinceram_refresh=([^;])/);
+  return match ? match[1] : null;
 }
 
-function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("refresh_token");
-}
-
+// --- refresh token attempt ---
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
   if (refreshPromise) return refreshPromise;
-  const refreshToken = getRefreshToken();
+  const refreshToken = getRefreshTokenFromCookie();
   if (!refreshToken) return false;
   refreshPromise = (async () => {
     try {
@@ -33,13 +36,16 @@ async function tryRefresh(): Promise<boolean> {
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
       if (!res.ok) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
+        // refresh failed → clear cookies so user is logged out
+        document.cookie = "tinceram_access=; max-age=0; path=/";
+        document.cookie = "tinceram_refresh=; max-age=0; path=/";
         return false;
       }
       const data = await res.json();
-      if (data.access_token) localStorage.setItem("access_token", data.access_token);
-      if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+      // سرвер معمولاً JSON برنمی‌گردونه، اما ممکن است برای سازگاری cookie ری‑SET کنه
+      if (data.access_token) {
+        document.cookie = `tinceram_access=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 days
+      }
       return true;
     } catch {
       return false;
@@ -50,11 +56,10 @@ async function tryRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
+// --- authHeaders: هیچ Bearer دستی نمی‌فرستد — 쿠kicredentials: "include" Bahá
 export function authHeaders(json = false): HeadersInit {
-  const token = getAccessToken();
   const h: Record<string, string> = {};
   if (json) h["Content-Type"] = "application/json";
-  if (token) h["Authorization"] = `Bearer ${token}`;
   return h;
 }
 
@@ -111,8 +116,7 @@ export async function apiFetch(
 
   const exec = async (): Promise<Response> => {
     const headers = new Headers(init.headers);
-    const token = getAccessToken();
-    if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+    // auth tokens exclusively via httponly cookies; no manual Bearer header.
     if (init.body && typeof init.body === "string" && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
@@ -122,8 +126,6 @@ export async function apiFetch(
     if (res.status === 401 && !init._retry) {
       const refreshed = await tryRefresh();
       if (refreshed) {
-        const newToken = getAccessToken();
-        if (newToken) headers.set("Authorization", `Bearer ${newToken}`);
         res = await fetch(url, { ...init, headers, credentials: "include", _retry: true } as RequestInit & { _retry?: boolean });
       }
     }

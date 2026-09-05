@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     max_login_attempts: int = 8
     login_lock_minutes: int = 15
 
+    # JWT secret rotation: comma-separated list of previous secrets still valid for verification.
+    # New tokens are always signed with secret_key; old secrets are only for verification during rotation.
+    previous_secret_keys: str = ""
+    previous_refresh_secret_keys: str = ""
+
+    # Upload limits
+    max_upload_size_mb: int = 10
+    max_avatar_size_mb: int = 2
+
     # --- Outgoing email (transactional). Empty SMTP host → dev console sink. ---
     smtp_host: str = ""
     smtp_port: int = 587

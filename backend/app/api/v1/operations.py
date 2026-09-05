@@ -1,6 +1,7 @@
 import json
 import secrets
-from datetime import UTC, datetime
+from datetime import datetime
+from app.compat import UTC
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -375,7 +376,34 @@ def update_order_status(order_id: str, data: dict, _: User = Depends(admin_user)
 
 @public.get("/articles")
 def articles(s: Session = Depends(get_session), offset: int=0, limit: int=Query(20,le=100)):
-    return s.exec(select(Article).where(Article.is_published==True).order_by(Article.published_at.desc()).offset(offset).limit(limit)).all() # noqa
+    rows = s.exec(select(Article).where(Article.is_published==True).order_by(Article.published_at.desc()).offset(offset).limit(limit)).all() # noqa
+    if not rows:
+        return []
+    author_ids = [a.author_id for a in rows if a.author_id]
+    authors = {u.id: u for u in s.exec(select(User).where(User.id.in_(author_ids))).all()} if author_ids else {}
+    cat_ids = [a.category_id for a in rows if a.category_id]
+    cats = {c.id: c.name for c in s.exec(select(ArticleCategory).where(ArticleCategory.id.in_(cat_ids))).all()} if cat_ids else {}
+    return [
+        {
+            "id": a.id,
+            "title": a.title,
+            "slug": a.slug,
+            "excerpt": a.excerpt,
+            "cover_url": a.cover_url,
+            "published_at": a.published_at,
+            "category_name": cats.get(a.category_id) if a.category_id else None,
+            "author_name": (authors[a.author_id].full_name or authors[a.author_id].email) if a.author_id and a.author_id in authors else None,
+            "author_avatar_url": authors[a.author_id].avatar_url if a.author_id and a.author_id in authors else None,
+            "reading_time_minutes": max(1, len(a.body) // 800) if a.body else 1,
+        }
+        for a in rows
+    ]
+
+
+@public.get("/article-categories")
+def public_article_categories(s: Session = Depends(get_session)):
+    cats = s.exec(select(ArticleCategory).order_by(ArticleCategory.name)).all()
+    return [{"id": c.id, "name": c.name, "slug": c.slug} for c in cats]
 
 @public.get("/articles/{slug}")
 def article(slug: str, s: Session = Depends(get_session)):
@@ -396,19 +424,6 @@ def get_setting(key: str, s: Session = Depends(get_session)):
     if not row: raise HTTPException(404,"تنظیمات یافت نشد")
     try: return {"key":key,"value":json.loads(row.value)}
     except Exception: return {"key":key,"value":row.value}
-
-@public.post("/newsletter")
-def newsletter(email: str, s: Session = Depends(get_session)):
-    row=s.exec(select(NewsletterSubscription).where(NewsletterSubscription.email==email.lower())).first()
-    if row: row.unsubscribed_at=None; row.consent=True
-    else: row=NewsletterSubscription(email=email.lower())
-    s.add(row); s.commit(); return {"ok":True}
-
-@public.delete("/newsletter/{email}")
-def unsubscribe(email: str, s: Session = Depends(get_session)):
-    row=s.exec(select(NewsletterSubscription).where(NewsletterSubscription.email==email.lower())).first()
-    if row: row.unsubscribed_at=datetime.now(UTC); s.add(row); s.commit()
-    return {"ok":True}
 
 @public.get("/shipping-methods")
 def public_shipping_methods(s: Session = Depends(get_session)):

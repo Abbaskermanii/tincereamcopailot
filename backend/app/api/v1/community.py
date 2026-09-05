@@ -1,7 +1,8 @@
 """Public storefront APIs: reviews, Q&A, stock-notify, CMS pages, FAQ, contact."""
 
 import re
-from datetime import UTC, datetime
+from datetime import datetime
+from app.compat import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field

@@ -61,8 +61,20 @@ export default function ArticlePage({ params }: Props) {
 
   const tagCount = article.tags?.length ?? 0;
 
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: article.title,
+    description: article.excerpt,
+    image: article.cover_image_url ? mediaUrl(article.cover_image_url) : undefined,
+    datePublished: article.published_at,
+    publisher: { "@type": "Organization", name: "تن‌سِرام" },
+    url: typeof window !== "undefined" ? window.location.href : "",
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-12">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }} />
       <TrackRecentlyViewed
         slug={article.slug}
         name={article.title}

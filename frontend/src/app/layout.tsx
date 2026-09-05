@@ -9,6 +9,7 @@ import { SettingsProvider } from "@/lib/settings-context";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { ServiceWorkerRegistrar } from "@/components/layout/service-worker-registrar";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const vazir = Vazirmatn({
   subsets: ["arabic"],
@@ -39,18 +40,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SettingsProvider>
             <AuthProvider>
               <CartProvider>
-                <ToastProvider>
-                  <a
-                    href="#main"
-                    className="sr-only focus:not-sr-only focus:absolute focus:right-4 focus:top-4 focus:z-[80] focus:rounded-xl focus:bg-lajvard focus:px-4 focus:py-2 focus:text-white"
-                  >
-                    پرش به محتوای اصلی
-                  </a>
-                  <Header />
-                  <main id="main">{children}</main>
-                  <Footer />
-                  <ServiceWorkerRegistrar />
-                </ToastProvider>
+                <ErrorBoundary>
+                  <ToastProvider>
+                    <a
+                      href="#main"
+                      className="sr-only focus:not-sr-only focus:absolute focus:right-4 focus:top-4 focus:z-[80] focus:rounded-xl focus:bg-lajvard focus:px-4 focus:py-2 focus:text-white"
+                    >
+                      پرش به محتوای اصلی
+                    </a>
+                    <Header />
+                    <main id="main">{children}</main>
+                    <Footer />
+                    <ServiceWorkerRegistrar />
+                  </ToastProvider>
+                </ErrorBoundary>
               </CartProvider>
             </AuthProvider>
           </SettingsProvider>

@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { mediaUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { apiFetch, authHeaders, getErrorMessage } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { UploadComponent as Upload } from "@/components/ui/upload";
 import { useToast } from "@/components/ui/toast-provider";
 import { faPrice } from "@/lib/format";
 
@@ -33,6 +35,8 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
   const [data, setData] = useState<unknown>(null);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [cropperOpen, setCropperOpen] = useState(false);
   const { toast } = useToast();
 
   const reload = async () => {
@@ -56,6 +60,10 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
       if (!res.ok) throw new Error();
       const json = await res.json();
       setData(json);
+      // Set avatar if available
+      if (json.avatar_url) {
+        setAvatarUrl(json.avatar_url);
+      }
     } catch {
       setError(true);
     } finally {
@@ -99,7 +107,7 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
       ) : loading ? (
         <p className="mt-6 text-ink-soft">در حال بارگذاری…</p>
       ) : section === "profile" ? (
-        <ProfileView data={data as { email: string; full_name: string; phone: string | null }} toast={toast} />
+        <ProfileView data={data as { email: string; full_name: string; phone: string | null; avatar_url: string | null }} avatarUrl={avatarUrl} toast={toast} />
       ) : section === "addresses" ? (
         <AddressesView data={data as Address[]} reload={reload} toast={toast} />
       ) : section === "orders" ? (
@@ -113,12 +121,14 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
   );
 }
 
-function ProfileView({ data, toast }: { data: { email: string; full_name: string; phone: string | null }; toast: ReturnType<typeof useToast>["toast"] }) {
+function ProfileView({ data, toast, avatarUrl }: { data: { email: string; full_name: string; phone: string | null; avatar_url: string | null }; avatarUrl: string | null; toast: ReturnType<typeof useToast>["toast"] }) {
   const [fullName, setFullName] = useState(data.full_name || "");
   const [phone, setPhone] = useState(data.phone || "");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -129,7 +139,23 @@ function ProfileView({ data, toast }: { data: { email: string; full_name: string
       body.password = newPw;
       body.current_password = currentPw;
     }
-    if (Object.keys(body).length === 0) {
+    if (avatarFile) {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append("file", avatarFile);
+      try {
+        const res = await apiFetch("/avatar/upload", { method: "POST", headers: authHeaders(true), body: formData });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.detail || j.message || " آپلود تصویر شکست خورد");
+        setAvatarUrl(j.url);
+        toast("آواتار آپلود شد.", "success");
+      } catch (err) {
+        toast(getErrorMessage(err), "error");
+      } finally {
+        setUploading(false);
+      }
+    }
+    if (Object.keys(body).length === 0 && !avatarFile) {
       toast("تغییری برای ذخیره وجود ندارد.", "error");
       setSaving(false);
       return;
@@ -155,17 +181,38 @@ function ProfileView({ data, toast }: { data: { email: string; full_name: string
         <p className="mt-4 text-sm text-char-soft">نام</p>
         <p className="font-medium">{data.full_name || "—"}</p>
         {data.phone && <><p className="mt-4 text-sm text-char-soft">موبایل</p><p dir="ltr" className="font-medium">{data.phone}</p></>}
+        {/* Avatar display with fallback to initials */}
+        <div className="mt-4 flex items-center gap-3">
+          <div className={cn("h-16 w-16 rounded-full flex items-center justify-center flex-shrink-0", avatarUrl ? "" : "bg-lajvard text-white text-xl")}>
+            {avatarUrl ? (
+              <Image src={avatarUrl} alt="avatar" fill className="object-cover" />
+            ) : (
+              <span className="">{fullName ? fullName[0] + fullName.slice(-1)[0] : "?"}</span>
+            )}
+          </div>
+          <div>
+            <p className="font-medium">{fullName || "—"}</p>
+            <p className="text-xs text-char-soft">برای تغییر آواتار روی 이미เจک کلیک کنید</p>
+          </div>
+        </div>
       </div>
       <form onSubmit={save} className="grid gap-4 rounded-2xl bg-surface p-6 shadow-shelf dark:bg-black/25">
         <Field label="نام کامل"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
         <Field label="موبایل"><Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" pattern="09\d{9}" placeholder="09123456789" /></Field>
+        <Upload
+          accept="image/*"
+          onFileChange={(file) => setAvatarFile(file)}
+          disabled={uploading}
+          className="mt-4"
+          placeholder="آپلود عکس آواتار (حداقل ۲ مگابایت)"
+        />
         <div className="border-t border-char/10 pt-4 dark:border-white/10">
           <p className="mb-3 font-bold">تغییر رمز عبور</p>
           <Field label="رمز فعلی"><Input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} dir="ltr" /></Field>
           <Field label="رمز جدید (حداقل 8 کاراکتر)"><Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} dir="ltr" /></Field>
           <p className="mt-2 text-xs text-char-soft">برای تغییر رمز، هر دو فیلد را پر کنید.</p>
         </div>
-        <Button type="submit" disabled={saving}>{saving ? "در حال ذخیره…" : "ذخیره تغییرات"}</Button>
+        <Button type="submit" disabled={saving || uploading}>{saving || uploading ? "در حال ذخیره…" : "ذخیره تغییرات"}</Button>
       </form>
     </div>
   );

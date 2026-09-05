@@ -1,76 +1,151 @@
-import { api, type ProductListItem } from "@/lib/api";
-import { ProductSection } from "@/components/store/product-section";
-import { CategorySection } from "@/components/store/category-section";
-import { ArticleSection } from "@/components/store/article-section";
-import { FAQSection } from "@/components/store/faq-section";
-import { NewsletterBand } from "@/components/store/newsletter-band";
-import { HomeCarousel } from "@/components/store/home-carousel";
+import { api } from "@/lib/api";
+import { HomeHero } from "@/components/home/home-hero";
+import { FeaturedProducts } from "@/components/home/featured-products";
+import { CategoryShowcase } from "@/components/home/category-showcase";
+import { ArticlesSection } from "@/components/home/articles-section";
+import { FaqSection } from "@/components/home/faq-section";
+import { TrustSection } from "@/components/home/trust-section";
+import { HomeCta } from "@/components/home/home-cta";
+import { CraftProcess } from "@/components/home/craft-process";
+import { WorkshopStory } from "@/components/home/workshop-story";
 
 export const revalidate = 120;
 
+interface ProductListItem {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  compare_at_price?: number | null;
+  short_description?: string | null;
+  stock_qty: number;
+  primary_image_url?: string | null;
+  discount_percent?: number;
+}
+
 interface CategoryItem {
-  id?: string;
+  id: string;
   name: string;
   slug: string;
   image_url?: string | null;
-  description?: string | null;
+  product_count?: number;
 }
 
 interface ArticleItem {
   id: string;
   title: string;
   slug: string;
-  excerpt: string | undefined;
-  published_at: string | undefined;
+  excerpt?: string | null;
+  published_at?: string | null;
+  cover_url?: string | null;
+  category_name?: string | null;
+  author_name?: string | null;
+  author_avatar_url?: string | null;
+  reading_time_minutes?: number;
 }
 
 interface FaqItem {
   id: string;
   question: string;
   answer: string;
-  category: string;
-  sort_order: number;
-  is_active: boolean;
+  category?: string;
+  sort_order?: number;
+  is_active?: boolean;
 }
 
 export default async function HomePage() {
-  // ابتدا فقط homepage را بگیر — اگر موفق بود، 5 درخواست fallback اصلاً زده نمی‌شود (کاهش 83% فشار)
   const homepageRes = await api.homepage();
   const sections = homepageRes?.sections ?? null;
 
   if (sections && sections.length > 0) {
+    const heroSection = sections.find((s) => s.kind === "hero");
+    const articleSection = sections.find((s) => s.kind === "articles");
+    const faqSection = sections.find((s) => s.kind === "faq");
+    const productSections = sections.filter((s) => s.kind === "products");
+    const categorySection = sections.find((s) => s.kind === "categories");
+
     return (
-      <div className="mx-auto max-w-7xl px-4 md:px-6">
-        {sections.map((sec) => {
-          if (sec.kind === "hero" && sec.slides && sec.slides.length > 0) {
-            return (
-              <div key={sec.id} className="py-6">
-                <HomeCarousel slides={sec.slides.map((s: { id: string; title: string | null; subtitle: string | null; image_url: string; link_url: string | null }, idx: number) => ({ ...s, sort_order: idx, is_active: true }))} />
-              </div>
-            );
-          }
-          if (sec.kind === "products" && sec.products) {
-            return <ProductSection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} products={sec.products as ProductListItem[]} />;
-          }
-          if (sec.kind === "categories" && sec.categories) {
-            return <CategorySection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} categories={sec.categories as CategoryItem[]} limit={8} />;
-          }
-          if (sec.kind === "articles" && sec.articles) {
-            return <ArticleSection key={sec.id} title={sec.title} articles={sec.articles as ArticleItem[]} limit={4} />;
-          }
-          if (sec.kind === "faq" && sec.faq) {
-            return <FAQSection key={sec.id} title={sec.title} subtitle={sec.subtitle ?? undefined} faq_items={sec.faq as FaqItem[]} limit={5} />;
-          }
-          if (sec.kind === "newsletter") {
-            return <NewsletterBand key={sec.id} />;
-          }
-          return null;
-        })}
+      <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8">
+        {/* 1. Hero */}
+        {heroSection && heroSection.slides && heroSection.slides.length > 0 && (
+          <HomeHero slides={heroSection.slides} />
+        )}
+
+        {/* 2. Trust / Craft Principles */}
+        <TrustSection />
+
+        {/* 3. Featured Products - Best Sellers */}
+        {productSections[0] && productSections[0].products && (
+          <FeaturedProducts
+            eyebrow="پرفروش‌ترین‌ها"
+            title={productSections[0].title || "محبوب‌ترین انتخاب‌ها"}
+            subtitle="قطعاتی که مشتریان بیش از همه دوست دارند"
+            products={productSections[0].products as ProductListItem[]}
+            headingVariant="bold"
+          />
+        )}
+
+        {/* 4. Categories */}
+        {categorySection && categorySection.categories && (
+          <CategoryShowcase
+            title={categorySection.title || "مجموعه‌ها"}
+            subtitle="سبک و سلیقه خود را پیدا کنید"
+            categories={categorySection.categories as CategoryItem[]}
+          />
+        )}
+
+        {/* 5. Craft Process */}
+        <CraftProcess />
+
+        {/* 6. New Arrivals */}
+        {productSections[1] && productSections[1].products && (
+          <FeaturedProducts
+            eyebrow="تازه از کوره"
+            title={productSections[1].title || "جدیدترین‌ها"}
+            subtitle="قطعات تازه آماده برای خانه شما"
+            products={productSections[1].products as ProductListItem[]}
+          />
+        )}
+
+        {/* 7. Workshop Story */}
+        <WorkshopStory />
+
+        {/* 8. Discounted Products */}
+        {productSections[2] && productSections[2].products && productSections[2].products.length > 0 && (
+          <FeaturedProducts
+            eyebrow="پیشنهاد ویژه"
+            title={productSections[2].title || "فرصت‌های محدود"}
+            subtitle="قیمت‌های استثنایی برای قطعات منتخب"
+            products={productSections[2].products as ProductListItem[]}
+          />
+        )}
+
+        {/* 9. Articles */}
+        {articleSection && articleSection.articles && (
+          <ArticlesSection
+            eyebrow="مجله تن‌سِرام"
+            title={articleSection.title || "داستان‌ها و راهنماها"}
+            subtitle="چیزهایی که ارزش خواندن دارند"
+            articles={articleSection.articles as ArticleItem[]}
+          />
+        )}
+
+        {/* 10. FAQ */}
+        {faqSection && faqSection.faq && (
+          <FaqSection
+            title={faqSection.title || "سوالات رایج"}
+            subtitle="پاسخ پرسش‌های پرتکرار"
+            faq_items={faqSection.faq as FaqItem[]}
+          />
+        )}
+
+        {/* 11. CTA */}
+        <HomeCta />
       </div>
     );
   }
 
-  // Fallback: فقط وقتی homepage در دسترس نیست — 4 درخواست موازی با حجم کمتر (16 به‌جای 50)
+  // Fallback: fetch individual APIs when homepage API is unavailable
   const [fallbackProducts, fallbackCategories, fallbackArticles, fallbackFaq, fallbackCarousels] = await Promise.all([
     api.products({ page_size: 24 }),
     api.categories(),
@@ -79,23 +154,27 @@ export default async function HomePage() {
     api.carousels(),
   ]);
 
-  // Fallback data preparation (used only when homepage API unavailable)
-  const fallbackAllProducts: ProductListItem[] = fallbackProducts?.items ?? [];
-  const fallbackAllCategories: CategoryItem[] = (fallbackCategories ?? []).map((c) => ({
-    id: c.id,
+  const allProducts: ProductListItem[] = fallbackProducts?.items ?? [];
+  const categories: CategoryItem[] = (fallbackCategories ?? []).map((c) => ({
+    id: c.id ?? "",
     name: c.name,
     slug: c.slug,
     image_url: c.image_url,
-    description: c.description,
+    product_count: undefined,
   }));
-  const fallbackAllArticles: ArticleItem[] = (fallbackArticles ?? []).map((a) => ({
+  const articles: ArticleItem[] = (fallbackArticles ?? []).map((a) => ({
     id: a.id,
     title: a.title,
     slug: a.slug,
     excerpt: a.excerpt,
     published_at: a.published_at,
+    cover_url: a.cover_url ?? null,
+    category_name: a.category_name ?? null,
+    author_name: a.author_name ?? null,
+    author_avatar_url: a.author_avatar_url ?? null,
+    reading_time_minutes: a.reading_time_minutes,
   }));
-  const fallbackAllFaq: FaqItem[] = (fallbackFaq ?? []).map((f) => ({
+  const faqItems: FaqItem[] = (fallbackFaq ?? []).map((f) => ({
     id: f.id,
     question: f.question,
     answer: f.answer,
@@ -103,81 +182,97 @@ export default async function HomePage() {
     sort_order: f.sort_order,
     is_active: f.is_active,
   }));
-  const fallbackSlides = (fallbackCarousels ?? []).filter((c) => c.is_active !== false);
+  const slides = (fallbackCarousels ?? [])
+    .filter((c) => c.is_active !== false)
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      subtitle: c.subtitle ?? null,
+      image_url: c.image_url,
+      link_url: c.link_url,
+    }));
 
-  // Fallback rendering (legacy) — فقط وقتی homepage خالی است
-  const featuredProducts = fallbackAllProducts.filter(
-    (p) => (p.compare_at_price && p.compare_at_price > p.price) || p.stock_qty > 0
-  ).slice(0, 8);
-  const newArrivals = fallbackAllProducts
-    .slice()
-    .sort((a, b) => (b.slug ?? "").localeCompare(a.slug ?? ""))
-    .slice(0, 8);
-  const bestSellers = fallbackAllProducts.filter((p) => p.stock_qty > 0).slice(0, 8);
-  const discountedProducts = fallbackAllProducts.filter(
-    (p) => p.compare_at_price && p.compare_at_price > p.price
-  ).slice(0, 8);
+  const bestSellers = allProducts.filter((p) => p.stock_qty > 0).slice(0, 12);
+  const newArrivals = allProducts.slice(0, 12);
+  const discounted = allProducts
+    .filter((p) => p.compare_at_price && p.compare_at_price > p.price)
+    .slice(0, 12);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 md:px-6">
-      {fallbackSlides.length > 0 && (
-        <div className="py-6">
-          <HomeCarousel slides={fallbackSlides.map((c) => ({
-            id: c.id,
-            title: c.title,
-            subtitle: c.subtitle ?? null,
-            image_url: c.image_url,
-            link_url: c.link_url,
-            sort_order: c.sort_order,
-            is_active: c.is_active,
-          }))} />
-        </div>
-      )}
+    <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8">
+      {/* 1. Hero */}
+      {slides.length > 0 && <HomeHero slides={slides} />}
 
-      <ProductSection
-        title="پیشنهادات ویژه"
-        subtitle="بهترین انتخاب‌ها با قیمت استثنایی"
-        products={featuredProducts}
-      />
-      <ProductSection
-        title="جدیدترین محصولات"
-        subtitle="تازه‌های کارگاه تن‌سِرام"
-        products={newArrivals}
-      />
-      <ProductSection
-        title="محبوب‌ترین‌ها"
-        subtitle="پرفروش‌های ما در میان مشتریان"
-        products={bestSellers}
-      />
-      {discountedProducts.length > 0 && (
-        <ProductSection
-          title="تخفیف‌های ویژه"
-          subtitle="فرصت‌های محدود با قیمت‌های باورنکردنی"
-          products={discountedProducts}
+      {/* 2. Trust */}
+      <TrustSection />
+
+      {/* 3. Best Sellers */}
+      {bestSellers.length > 0 && (
+        <FeaturedProducts
+          eyebrow="پرفروش‌ترین‌ها"
+          title="محبوب‌ترین انتخاب‌ها"
+          subtitle="قطعاتی که مشتریان بیش از همه دوست دارند"
+          products={bestSellers}
+          headingVariant="bold"
         />
       )}
 
-      <CategorySection
-        title="دسته‌بندی‌های محبوب"
-        subtitle="محصولات ما در دسته‌بندی‌های متنوع"
-        categories={fallbackAllCategories}
-        limit={6}
-      />
+      {/* 4. Categories */}
+      {categories.length > 0 && (
+        <CategoryShowcase
+          title="مجموعه‌ها"
+          subtitle="سبک و سلیقه خود را پیدا کنید"
+          categories={categories}
+        />
+      )}
 
-      <ArticleSection
-        title="مقالات و اخبار"
-        articles={fallbackAllArticles}
-        limit={4}
-      />
+      {/* 5. Craft Process */}
+      <CraftProcess />
 
-      <FAQSection
-        title="سوالات رایج"
-        subtitle="پاسخ‌های سریع به سوال‌های شما"
-        faq_items={fallbackAllFaq}
-        limit={4}
-      />
+      {/* 6. New Arrivals */}
+      {newArrivals.length > 0 && (
+        <FeaturedProducts
+          eyebrow="تازه از کوره"
+          title="جدیدترین‌ها"
+          subtitle="قطعات تازه آماده برای خانه شما"
+          products={newArrivals}
+        />
+      )}
 
-      <NewsletterBand />
+      {/* 7. Workshop Story */}
+      <WorkshopStory />
+
+      {/* 8. Discounted */}
+      {discounted.length > 0 && (
+        <FeaturedProducts
+          eyebrow="پیشنهاد ویژه"
+          title="فرصت‌های محدود"
+          subtitle="قیمت‌های استثنایی برای قطعات منتخب"
+          products={discounted}
+        />
+      )}
+
+      {/* 9. Articles */}
+      {articles.length > 0 && (
+        <ArticlesSection
+          eyebrow="مجله تن‌سِرام"
+          title="داستان‌ها و راهنماها"
+          subtitle="چیزهایی که ارزش خواندن دارند"
+          articles={articles}
+        />
+      )}
+
+      {/* 10. FAQ */}
+      {faqItems.length > 0 && (
+        <FaqSection
+          title="سوالات رایج"
+          subtitle="پاسخ پرسش‌های پرتکرار"
+          faq_items={faqItems}
+        />
+      )}
+
+      {/* 11. CTA */}
+      <HomeCta />
     </div>
   );
 }

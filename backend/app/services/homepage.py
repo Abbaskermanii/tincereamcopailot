@@ -5,13 +5,15 @@ change the page calls `invalidate_home()`.
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
+from app.compat import UTC
 
 from sqlalchemy import func, text
 from sqlmodel import Session, select
 
 from app.models import (
     Article,
+    ArticleCategory,
     Carousel,
     Category,
     FAQItem,
@@ -19,6 +21,7 @@ from app.models import (
     HomepageSectionKind,
     Product,
     ProductSource,
+    User,
 )
 from app.services.cache import cache_delete_pattern, cache_get_json, cache_set_json
 
@@ -181,8 +184,23 @@ def _section_payload(session: Session, s: HomepageSection) -> dict:
             .order_by(Article.published_at.desc())
             .limit(s.limit_count)
         ).all()
+        author_ids = [a.author_id for a in rows if a.author_id]
+        authors = {u.id: u for u in session.exec(select(User).where(User.id.in_(author_ids))).all()} if author_ids else {}
+        cat_ids = [a.category_id for a in rows if a.category_id]
+        cats = {c.id: c.name for c in session.exec(select(ArticleCategory).where(ArticleCategory.id.in_(cat_ids))).all()} if cat_ids else {}
         payload["articles"] = [
-            {"id": a.id, "title": a.title, "slug": a.slug, "excerpt": a.excerpt, "published_at": a.published_at}
+            {
+                "id": a.id,
+                "title": a.title,
+                "slug": a.slug,
+                "excerpt": a.excerpt,
+                "published_at": a.published_at,
+                "cover_url": a.cover_url,
+                "category_name": cats.get(a.category_id) if a.category_id else None,
+                "author_name": (authors[a.author_id].full_name or authors[a.author_id].email) if a.author_id and a.author_id in authors else None,
+                "author_avatar_url": authors[a.author_id].avatar_url if a.author_id and a.author_id in authors else None,
+                "reading_time_minutes": max(1, len(a.body) // 800) if a.body else 1,
+            }
             for a in rows
         ]
     elif s.kind == HomepageSectionKind.faq:
@@ -193,7 +211,8 @@ def _section_payload(session: Session, s: HomepageSection) -> dict:
             .limit(s.limit_count)
         ).all()
         payload["faq"] = [
-            {"id": f.id, "question": f.question, "answer": f.answer} for f in rows
+            {"id": f.id, "question": f.question, "answer": f.answer, "category": f.category, "sort_order": f.sort_order, "is_active": f.is_active}
+            for f in rows
         ]
     return payload
 
@@ -225,5 +244,4 @@ def default_sections() -> list[HomepageSection]:
         HomepageSection(kind=HomepageSectionKind.products, title="پیشنهاد ویژه", source=ProductSource.discounted, sort_order=40, limit_count=8),
         HomepageSection(kind=HomepageSectionKind.articles, title="از مجله تن‌سِرام", sort_order=50, limit_count=4),
         HomepageSection(kind=HomepageSectionKind.faq, title="سوالات رایج", sort_order=60, limit_count=5),
-        HomepageSection(kind=HomepageSectionKind.newsletter, title="خبرنامه", sort_order=70),
     ]

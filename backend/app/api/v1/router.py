@@ -6,6 +6,7 @@ from app.api.v1.admin_stats import router as admin_stats_router
 from app.api.v1.catalog import router as catalog_router
 from app.api.v1.community import public as community_public
 from app.api.v1.coupons import router as coupons_router
+from app.api.v1.emails import router as emails_router
 from app.api.v1.feeds import router as feeds_router
 from app.api.v1.orders import router as orders_router
 from app.api.v1.payments import router as payments_router
@@ -42,6 +43,7 @@ api_router.include_router(catalog_router, tags=["catalog"])
 api_router.include_router(orders_router, tags=["orders"])
 api_router.include_router(payments_router, tags=["payments"])
 api_router.include_router(coupons_router, tags=["coupons"])
+api_router.include_router(emails_router, tags=["email"])
 api_router.include_router(feeds_router, tags=["feeds"])
 api_router.include_router(search_router, tags=["search"])
 api_router.include_router(admin_stats_router, tags=["admin"])

@@ -6,6 +6,7 @@ from sqlmodel import Field, Relationship
 from app.models.base import TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.models.attribute import ProductAttributeValue
     from app.models.category import Category
     from app.models.product_image import ProductImage
 
@@ -42,6 +43,7 @@ class Product(UUIDMixin, TimestampMixin, table=True):
 
     category: "Category" = Relationship(back_populates="products")
     images: list["ProductImage"] = Relationship(back_populates="product")
+    attribute_specs: list["ProductAttributeValue"] = Relationship(back_populates="product")
 
     @property
     def primary_image(self) -> Optional["ProductImage"]:

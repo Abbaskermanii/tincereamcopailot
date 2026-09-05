@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { X } from "lucide-react";
+import { X, Share2, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeading } from "@/components/ui/section-heading";
@@ -10,11 +10,13 @@ import { useWishlist } from "@/lib/local-store";
 import { useEffect, useState } from "react";
 import { mediaUrl, type ProductListItem } from "@/lib/api";
 import { faPrice } from "@/lib/format";
+import { useToast } from "@/components/ui/toast-provider";
 
 export default function WishlistPage() {
   const { ids, toggle, isServer } = useWishlist();
   const [items, setItems] = useState<ProductListItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -98,9 +100,33 @@ export default function WishlistPage() {
     ? "لیست ذخیره‌شده در حساب شما — در همه دستگاه‌ها همگام"
     : "لیست محلی مرورگر شما — بدون نیاز به حساب کاربری";
 
+  const shareWishlist = async () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    const text = `لیست علاقه‌مندی‌های من در تن‌سِرام — ${items.length} محصول`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: text, url });
+      } catch {}
+    } else if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      toast({ title: "لینک کپی شد", variant: "success" });
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 md:px-6">
-      <SectionHeading title="علاقه‌مندی‌ها" subtitle={subtitle} />
+      <div className="flex items-center justify-between">
+        <SectionHeading title="علاقه‌مندی‌ها" subtitle={subtitle} />
+        {items.length > 0 && (
+          <button
+            type="button"
+            onClick={shareWishlist}
+            className="flex min-h-[40px] items-center gap-2 rounded-xl border border-char/20 px-4 text-sm hover:bg-char/5 dark:border-white/20"
+          >
+            <Share2 className="h-4 w-4" /> اشتراک‌گذاری
+          </button>
+        )}
+      </div>
       {items.length === 0 ? (
         <EmptyState
           title="هنوز چیزی نشان نکرده‌اید"
@@ -111,13 +137,30 @@ export default function WishlistPage() {
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {items.map((p) => (
             <div key={p.id} className="glaze-edge relative overflow-hidden rounded-wobble bg-surface p-3 shadow-shelf">
-              <button
-                aria-label={`حذف ${p.name} از علاقه‌مندی‌ها`}
-                onClick={() => toggle(p.id)}
-                className="absolute left-3 top-3 z-10 rounded-xl bg-black/40 p-1.5 text-white backdrop-blur hover:bg-black/60"
-              >
-                <X size={15} />
-              </button>
+              <div className="absolute left-3 top-3 z-10 flex flex-col gap-2">
+                <button
+                  aria-label={`حذف ${p.name} از علاقه‌مندی‌ها`}
+                  onClick={() => toggle(p.id)}
+                  className="rounded-xl bg-black/40 p-1.5 text-white backdrop-blur hover:bg-black/60"
+                >
+                  <X size={15} />
+                </button>
+                <button
+                  aria-label={`افزودن ${p.name} به سبد خرید`}
+                  onClick={async () => {
+                    try {
+                      const { apiFetch } = await import("@/lib/api-client");
+                      await apiFetch("/cart/items", { method: "POST", body: JSON.stringify({ product_id: p.id, quantity: 1 }) });
+                      toast({ title: "به سبد اضافه شد", variant: "success" });
+                    } catch {
+                      toast({ title: "خطا در افزودن به سبد", variant: "error" });
+                    }
+                  }}
+                  className="rounded-xl bg-firouzeh/90 p-1.5 text-white backdrop-blur hover:bg-firouzeh"
+                >
+                  <ShoppingCart size={15} />
+                </button>
+              </div>
               <Link href={`/product/${p.slug}`} className="block">
                 <div className="relative aspect-square overflow-hidden rounded-2xl bg-slip dark:bg-surface">
                   {p.primary_image_url && (

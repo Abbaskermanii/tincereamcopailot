@@ -7,6 +7,10 @@ import {
 import { TrendingUp, TrendingDown, ShoppingBag, Package, Users, Clock } from "lucide-react";
 import {
   AdminCard, DataTable, ErrorBanner, PageHeader, StatCard, StatusBadge,
+  Carousel,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
 } from "@/components/admin/kit";
 import { useAdminResource } from "@/lib/admin-hooks";
 import { faNum, faPrice, toPersianDigits } from "@/lib/format";
@@ -28,6 +32,51 @@ interface DashboardData {
   recent_orders: { id: string; order_number: string; customer_name: string; total_amount: number; status: string; created_at: string }[];
 }
 
+interface HomepageSection {
+  id: string;
+  kind: string;
+  title: string;
+  subtitle: string | null;
+  is_enabled: boolean;
+  sort_order: number;
+  limit_count: number;
+  source: string | null;
+  category_id: string | null;
+  category_name: string | null;
+  product_ids: string[];
+  manual_product_count: number;
+}
+
+interface ProductItem {
+  id: string;
+  name: string;
+  image_url: string | null;
+  price: number;
+  compare_at_price: number | null;
+  slug: string;
+}
+
+interface CategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string | null;
+}
+
+interface ArticleItem {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  published_at: string | null;
+}
+
+interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
 function ChangePct({ value }: { value: number | null }) {
   if (value === null) return <p className="mt-1 text-xs text-ink-soft">مقایسه با دورهٔ قبل موجود نیست</p>;
   const up = value >= 0;
@@ -39,8 +88,153 @@ function ChangePct({ value }: { value: number | null }) {
   );
 }
 
+function ProductCard({ product }: { product: ProductItem }) {
+  return (
+    <div className="glaze-edge rounded-xl p-3 transition-all hover:shadow-lifted">
+      <Link href={`/admin/products/${product.id}`} className="flex min-w-0 flex-1 items-center gap-3 hover:text-lajvard">
+        {product.image_url ? (
+          <img src={product.image_url} alt={product.name} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+        ) : (
+          <div className="h-16 w-16 shrink-0 rounded-lg bg-lajvard/10 flex items-center justify-center">
+            <Package className="h-6 w-6 text-lajvard dark:text-lajvard-soft" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-sm">{product.name}</p>
+          <p className="mt-1 text-xs text-ink-soft">{faPrice(product.price)}</p>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+function CategoryCard({ category }: { category: CategoryItem }) {
+  return (
+    <Link href={`/admin/categories`} className="glaze-edge flex h-24 items-center justify-center rounded-xl border border-char/15 p-3 transition-all hover:shadow-shelf hover:border-lajvard/30 dark:border-white/15">
+      {category.image_url ? (
+        <img src={category.image_url} alt={category.name} className="h-full w-full object-cover rounded-lg" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center">
+          <Package className="h-10 w-10 text-ink-soft" />
+        </div>
+      )}
+    </Link>
+  );
+}
+
+function ArticleCard({ article }: { article: ArticleItem }) {
+  const formattedDate = article.published_at
+    ? new Date(article.published_at).toLocaleDateString('fa-IR')
+    : '';
+
+  return (
+    <div className="glaze-edge flex h-24 flex-1 flex-col justify-between rounded-xl p-3 transition-all hover:shadow-shelf">
+      <p className="line-clamp-2 font-medium text-sm">{article.title}</p>
+      <p className="text-xs text-ink-soft">{formattedDate}</p>
+    </div>
+  );
+}
+
+function FaqCard({ faq }: { faq: FaqItem }) {
+  return (
+    <div className="glaze-edge flex flex-1 flex-col justify-between rounded-xl p-3 transition-all hover:shadow-shelf">
+      <p className="font-medium text-sm">{faq.question}</p>
+      <p className="line-clamp-2 text-xs text-ink-soft">{faq.answer}</p>
+    </div>
+  );
+}
+
+function renderHomepageSection(section: HomepageSection, products: ProductItem[], categories: CategoryItem[], articles: ArticleItem[], faqs: FaqItem[]) {
+  const relevantProducts = section.product_ids.length > 0
+    ? products.filter(p => section.product_ids.includes(p.id))
+    : products.slice(0, section.limit_count);
+
+  if (section.kind === "products" && section.source === "manual" && section.manual_product_count > 0) {
+    return (
+      <div className="w-full">
+        <Carousel className="w-full">
+          <CarouselPrevious />
+          <CarouselNext />
+          {relevantProducts.map((product) => (
+            <CarouselItem key={product.id} className="basis-1/4 md:basis-1/5 lg:basis-1/6">
+              <ProductCard product={product} />
+            </CarouselItem>
+          ))}
+        </Carousel>
+      </div>
+    );
+  }
+
+  if (section.kind === "products") {
+    return (
+      <div className="w-full">
+        <Carousel className="w-full">
+          <CarouselPrevious />
+          <CarouselNext />
+          {relevantProducts.slice(0, section.limit_count).map((product) => (
+            <CarouselItem key={product.id} className="basis-1/4 md:basis-1/5 lg:basis-1/6">
+              <ProductCard product={product} />
+            </CarouselItem>
+          ))}
+        </Carousel>
+      </div>
+    );
+  }
+
+  if (section.kind === "categories") {
+    return (
+      <div className="w-full">
+        <Carousel className="w-full">
+          <CarouselPrevious />
+          <CarouselNext />
+          {categories.slice(0, section.limit_count).map((category) => (
+            <CarouselItem key={category.id} className="basis-1/4 md:basis-1/5 lg:basis-1/6">
+              <CategoryCard category={category} />
+            </CarouselItem>
+          ))}
+        </Carousel>
+      </div>
+    );
+  }
+
+  if (section.kind === "articles") {
+    return (
+      <div className="w-full">
+        <Carousel className="w-full">
+          <CarouselPrevious />
+          <CarouselNext />
+          {articles.slice(0, section.limit_count).map((article) => (
+            <CarouselItem key={article.id} className="basis-1/2 md:basis-1/3">
+              <ArticleCard article={article} />
+            </CarouselItem>
+          ))}
+        </Carousel>
+      </div>
+    );
+  }
+
+  if (section.kind === "faq") {
+    return (
+      <div className="w-full">
+        <Carousel className="w-full">
+          <CarouselPrevious />
+          <CarouselNext />
+          {faqs.slice(0, section.limit_count).map((faq) => (
+            <CarouselItem key={faq.id} className="basis-1/2 md:basis-1/3">
+              <FaqCard faq={faq} />
+            </CarouselItem>
+          ))}
+        </Carousel>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export default function AdminDashboardPage() {
   const { data, loading, error, reload } = useAdminResource<DashboardData>("/admin/dashboard?days=30");
+  const { data: sections } = useAdminResource<HomepageSection[]>("/admin/homepage-sections");
 
   const chartData = (data?.sales_series ?? []).map((d) => ({
     ...d,
@@ -143,6 +337,20 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </AdminCard>
+
+      {/* Homepage sections - display real data from admin homepage */}
+      {sections && sections.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 text-sm font-medium text-ink-soft">صفحه اصلی (سکشن‌ها)</h2>
+          <div className="flex flex-col gap-3">
+            {sections
+              .filter(s => s.is_enabled)
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map(section => renderHomepageSection(section, [], [], [], [])
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         {/* Recent orders */}
