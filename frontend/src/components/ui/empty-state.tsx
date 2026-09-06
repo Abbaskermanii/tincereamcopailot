@@ -48,7 +48,7 @@ export function EmptyState({
       )}
 
       {action && React.isValidElement(action) && <>{action}</>}
-      {action && !React.isValidElement(action) && (
+      {action && !React.isValidElement(action) && typeof action === "object" && "label" in action && (
         <div className="flex gap-2">
           {action.onClick ? (
             <button

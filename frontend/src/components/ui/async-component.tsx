@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useLoading } from "@/hooks/use-loading";
-import { LoadingSpinner } from "@/components/ui/loading";
+import { LoadingSpinner } from "@/components/ui/skeleton";
 
 interface AsyncComponentProps<T> {
   fetchFn: () => Promise<T>;

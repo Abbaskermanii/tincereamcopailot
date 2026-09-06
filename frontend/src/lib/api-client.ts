@@ -17,7 +17,7 @@ export interface ApiError {
 function getRefreshTokenFromCookie(): string | null {
   if (typeof window === "undefined") return null;
   const match = document.cookie.match(/(?:^|; )tinceram_refresh=([^;])/);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 // --- refresh token attempt ---

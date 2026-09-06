@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Skeleton } from "./skeleton";
-import { LoadingSpinner } from "./loading";
 
 interface UseSkeletonResult<T> {
   isLoading: boolean;

@@ -112,12 +112,19 @@ export default async function ProductPage({ params }: Props) {
 
       <TrackRecentlyViewed slug={product.slug} name={product.name} price={product.price} imageUrl={product.images?.[0]?.url ?? ""} />
 
+      {/* 1) Gallery + buy box */}
       <ProductView product={viewProduct} />
 
-      {/* Related, Reviews, Questions are streamed - they fetch in parallel where possible */}
+      {/* 2) Community: reviews & questions — now integrated in tabs */}
+      <div className="mt-14 md:mt-16">
+        <ProductReviews productId={product.id} />
+        <ProductQuestions productId={product.id} />
+      </div>
+
+      {/* 3) Related products from the same collection */}
       <RelatedProducts categorySlug={product.category_slug ?? null} excludeSlug={product.slug} />
-      <ProductReviews productId={product.id} />
-      <ProductQuestions productId={product.id} />
+
+      {/* 4) Recently viewed */}
       <RecentlyViewed excludeSlug={product.slug} />
     </div>
   );

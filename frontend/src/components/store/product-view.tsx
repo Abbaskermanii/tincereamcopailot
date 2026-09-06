@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import Link from "next/link";
 import { ShieldCheck, Truck, HandHeart } from "lucide-react";
 import { BreadcrumbNav } from "@/components/ui/breadcrumbs";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +62,7 @@ function sanitizeDescription(html: string): string {
 
 export function ProductView({ product }: { product: Product }) {
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [activeTab, setActiveTab] = useState<'description' | 'specifications' | 'reviews'>('description');
 
   const handleVariantSelect = React.useCallback(
     (variant: { id: string; name: string; sku?: string; image_url?: string; price_delta: number; absolute_price: number | null; stock_qty: number }) => {
@@ -109,15 +111,15 @@ export function ProductView({ product }: { product: Product }) {
           <ProductGallery images={product.images} productName={product.name} variantImageUrl={selectedVariant?.image_url} variantName={selectedVariant?.name} />
         </div>
 
-        <div id="buy-box" className="space-y-6">
+        <div id="buy-box" className="scroll-mt-24 space-y-6">
           <div>
             {product.category_name && (
-              <a
-                href={`/shop?category=${product.category_slug}`}
+              <Link
+                href={product.category_slug ? `/shop?category=${product.category_slug}` : "/shop"}
                 className="mb-2 inline-block rounded-full bg-lajvard/8 px-3 py-1 text-[11px] font-bold text-lajvard transition-colors hover:bg-lajvard/15 dark:bg-lajvard-soft/15 dark:text-lajvard-soft"
               >
                 {product.category_name}
-              </a>
+              </Link>
             )}
             <h1 className="text-2xl font-extrabold leading-snug md:text-3xl">
               {product.name}
@@ -170,28 +172,77 @@ export function ProductView({ product }: { product: Product }) {
             ))}
           </div>
 
-          <dl className="space-y-3 rounded-wobble-card bg-surface p-5 text-sm shadow-shelf dark:bg-black/25">
-            {[
-              ["جنس", product.material],
-              ["ابعاد", product.dimensions],
-              ["وزن", product.weight_grams ? `حدود ${faNum(product.weight_grams)} گرم` : null],
-            ]
-              .filter((row): row is [string, string] => Boolean(row[1]))
-              .map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-4">
-                  <dt className="text-char-soft dark:text-ink-soft">{k}</dt>
-                  <dd className="font-medium">{v}</dd>
-                </div>
-              ))}
-          </dl>
+          {/* Tab navigation */}
+          <div className="flex border-b border-char/10 pb-2 dark:border-white/10">
+            <button
+              type="button"
+              onClick={() => setActiveTab('description')}
+              className={`px-4 py-2 font-bold ${activeTab === 'description' ? 'border-b-2 border-lajvard text-lajvard' : 'text-char-soft hover:text-lajvard dark:text-ink-soft dark:hover:text-white/75'}`}
+            >
+              توضیحات
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('specifications')}
+              className={`px-4 py-2 font-bold ${activeTab === 'specifications' ? 'border-b-2 border-lajvard text-lajvard' : 'text-char-soft hover:text-lajvard dark:text-ink-soft dark:hover:text-white/75'}`}
+            >
+              مشخصات
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('reviews')}
+              className={`px-4 py-2 font-bold ${activeTab === 'reviews' ? 'border-b-2 border-lajvard text-lajvard' : 'text-char-soft hover:text-lajvard dark:text-ink-soft dark:hover:text-white/75'}`}
+            >
+              نظرات و پرسش‌ها
+            </button>
+          </div>
 
-          <details className="group rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25" open>
-            <summary className="cursor-pointer list-none font-bold">توضیحات کامل</summary>
-            <div
-              className="article-body mt-3 text-sm"
-              dangerouslySetInnerHTML={{ __html: sanitizeDescription(product.description ?? "") }}
-            />
-          </details>
+          {/* Tab content */}
+          <div className="space-y-6">
+            {activeTab === 'description' && (
+              <div className="rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25">
+                <div
+                  className="article-body text-sm"
+                  dangerouslySetInnerHTML={{ __html: sanitizeDescription(product.description ?? "") }}
+                />
+              </div>
+            )}
+
+            {activeTab === 'specifications' && (
+              <div className="space-y-3 rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25">
+                {[
+                  ["جنس", product.material],
+                  ["ابعاد", product.dimensions],
+                  ["وزن", product.weight_grams ? `حدود ${faNum(product.weight_grams)} گرم` : null],
+                  ["دسته‌بندی", product.category_name],
+                ]
+                  .filter((row): row is [string, string] => Boolean(row[1]))
+                  .map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-4">
+                      <dt className="text-char-soft dark:text-ink-soft">{k}</dt>
+                      <dd className="font-medium">{v}</dd>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div className="space-y-6">
+                <div className="rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25">
+                  <h3 className="text-xl font-extrabold">نظرات مشتریان</h3>
+                  <p className="mt-3 text-sm text-char-soft dark:text-ink-soft">
+                    نظرات این محصول به صورت آنلاین منتشر می‌شود. شما می‌توانید برای اولین بار درباره این محصول نظر بدهید.
+                  </p>
+                </div>
+                <div className="rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25">
+                  <h3 className="text-xl font-extrabold">پرسش و پاسخ</h3>
+                  <p className="mt-3 text-sm text-char-soft dark:text-ink-soft">
+                    پرسش مربوط به این محصول می‌تواند در این بخش ثبت شود.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <details className="rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25">
             <summary className="cursor-pointer list-none font-bold">نگهداری و ارسال</summary>

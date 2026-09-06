@@ -3,6 +3,19 @@
 import React from "react";
 import Link from "next/link";
 import { CheckCircle, Package, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface TimelineStep {
+  title: string;
+  completed: boolean;
+  icon: React.ReactNode;
+  info?: string;
+}
+
+interface StatusConfig {
+  status: string;
+  timeline: TimelineStep[];
+}
 
 interface OrderStatusProps {
   status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
@@ -92,8 +105,8 @@ export function OrderStatus({ status, orderNumber, className = "" }: OrderStatus
   );
 }
 
-function getOrderStatusConfig(status: string) {
-  const configs = {
+function getOrderStatusConfig(status: string): StatusConfig {
+  const configs: Record<string, StatusConfig> = {
     pending: {
       status: "در انتظار تایید",
       timeline: [
@@ -145,5 +158,5 @@ function getOrderStatusConfig(status: string) {
     },
   };
 
-  return configs[status] || configs.pending;
+  return configs[status] ?? { status: "نامشخص", timeline: [] };
 }

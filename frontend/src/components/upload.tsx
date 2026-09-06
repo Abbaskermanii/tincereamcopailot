@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-import { getErrorMessage } from "@/lib/api";
+import { getErrorMessage } from "@/lib/api-client";
 
 interface UploadProps {
   onSuccess: (url: string) => void;

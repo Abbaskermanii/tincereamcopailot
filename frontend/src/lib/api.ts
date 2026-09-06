@@ -5,6 +5,10 @@ export const SITE_URL =
 const API_ORIGIN = API_URL.replace(/\/api\/v1\/?$/, "");
 export function mediaUrl(path: string | null | undefined): string {
   if (!path) return "";
+  // Normalize legacy absolute media URLs that were stored with the wrong origin
+  // (e.g. http://localhost:3000/api/v1/media/... or any host) → API origin.
+  const mediaMatch = path.match(/\/api\/v1\/media\/(.+)$/);
+  if (mediaMatch) return `${API_ORIGIN}/api/v1/media/${mediaMatch[1]}`;
   if (/^https?:\/\//.test(path)) return path;
   return `${API_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
 }

@@ -1,3 +1,5 @@
+import { useState, useEffect, useCallback } from "react";
+
 interface CsrfToken {
   token: string;
   expiresAt: number;
@@ -83,7 +85,7 @@ export function getCsrfTokenFromCookie(): string | null {
     const cookies = document.cookie.split(";");
     for (const cookie of cookies) {
       const [name, value] = cookie.trim().split("=");
-      if (name === CSRF_COOKIE_NAME) {
+      if (name === CSRF_COOKIE_NAME && value !== undefined) {
         return decodeURIComponent(value);
       }
     }
@@ -147,7 +149,8 @@ export function useCsrf() {
  * Form data parser that includes CSRF token
  */
 export function parseCsrfFormData(formData: FormData, csrfToken?: string) {
-  const data = new FormData(formData);
+  const data = new FormData();
+  formData.forEach((value, key) => data.append(key, value));
   if (csrfToken) {
     data.set("_csrf", csrfToken);
   }

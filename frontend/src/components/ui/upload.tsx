@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useDropzone } from "react-dropzone";
+import { useDropzone, type FileRejection } from "react-dropzone";
 import { ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -23,15 +23,10 @@ export function UploadComponent({
 }: UploadProps) {
   const [preview, setPreview] = useState<string | null>(value || null);
 
-    interface RejectedFile {
-      errors?: Array<{ code: string }>
-    }
-
-
   const onDrop = useCallback(
-    (acceptedFiles: File[], rejectedFiles: RejectedFile[]) => {
-      if (rejectedFiles.length > 0) {
-        const maxSizeError = rejectedFiles.find((f) => f.errors?.find((e) => e.code === "file-too-large"));
+    (acceptedFiles: File[], fileRejections: FileRejection[]) => {
+      if (fileRejections.length > 0) {
+        const maxSizeError = fileRejections.find((f) => f.errors?.find((e) => e.code === "file-too-large"));
         if (maxSizeError) {
           toast.error("فایل انتخاب شده بیش از حد مجاز است", {
             description: `حداکثر حجم مجاز: ${(maxSize / 1024 / 1024).toFixed(2)} MB`,
@@ -40,19 +35,18 @@ export function UploadComponent({
         return;
       }
 
-      if (acceptedFiles.length > 0) {
-        const file = acceptedFiles[0];
-        const reader = new FileReader();
+      const file = acceptedFiles[0];
+      if (!file) return;
+      const reader = new FileReader();
 
-        reader.onload = (e) => {
-          const result = e.target?.result as string;
-          setPreview(result);
-          onFileChange(result);
-          toast.success("تصویر با موفقیت بارگذاری شد");
-        };
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setPreview(result);
+        onFileChange(result);
+        toast.success("تصویر با موفقیت بارگذاری شد");
+      };
 
-        reader.readAsDataURL(file);
-      }
+      reader.readAsDataURL(file);
     },
     [maxSize, onFileChange]
   );

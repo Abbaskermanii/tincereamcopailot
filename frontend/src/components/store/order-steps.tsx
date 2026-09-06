@@ -101,7 +101,7 @@ export function ProductDetailSteps({
               : "bg-char/5 text-char-600 dark:text-char-400"
           )}
         >
-          {step.icon && <div className={cn("shrink-0", step.completed ? "text-lajvard" : "")}>{step.icon}</div>}
+          {step.icon && <div className={cn("shrink-0", activeStep === step.order ? "text-lajvard" : "")}>{step.icon}</div>}
           <div className="flex-1">
             <h3 className="font-medium">{step.title}</h3>
             {step.description && (

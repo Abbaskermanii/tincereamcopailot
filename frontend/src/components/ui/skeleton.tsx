@@ -1,10 +1,25 @@
 import { cn } from "@/lib/utils";
 
-export function Skeleton({ className }: { className?: string }) {
+export function Skeleton({
+  className,
+  width,
+  height,
+  variant = "rect",
+}: {
+  className?: string;
+  width?: string;
+  height?: string;
+  variant?: "rect" | "circle";
+}) {
   return (
     <div
       aria-hidden
-      className={cn("animate-pulse rounded-xl bg-char/8 dark:bg-white/10", className)}
+      style={width || height ? { width, height } : undefined}
+      className={cn(
+        "animate-pulse bg-char/8 dark:bg-white/10",
+        variant === "circle" ? "rounded-full" : "rounded-xl",
+        className,
+      )}
     />
   );
 }

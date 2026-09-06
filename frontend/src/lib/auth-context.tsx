@@ -30,14 +30,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    // Auth state is resolved from the httponly cookie session (credentials:"include"
+    // inside apiFetch). localStorage tokens are only a legacy fallback — never a gate.
     try {
-      const res = await apiFetch("/auth/me", { method: "GET" });
+      const res = await apiFetch("/auth/me", { method: "GET", _noCache: true } as RequestInit);
       if (!res.ok) {
         if (res.status === 401) {
           localStorage.removeItem("access_token");

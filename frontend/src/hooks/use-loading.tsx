@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { LoadingSpinner } from "../ui/loading";
-import { Skeleton } from "../ui/skeleton";
+import { LoadingSpinner } from "@/components/ui/skeleton";
 
 interface UseLoadingResult<T> {
   data: T | null;

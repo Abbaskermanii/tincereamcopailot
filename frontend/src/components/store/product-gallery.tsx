@@ -43,7 +43,15 @@ export function ProductGallery({
     return () => { emblaApi.off("select", onSelect); };
   }, [emblaApi]);
 
-  if (!current) return null;
+  if (!current) {
+    // No product images yet — show a stable placeholder instead of nothing.
+    return (
+      <div className="flex aspect-square w-full items-center justify-center rounded-wobble-card bg-surface shadow-shelf dark:bg-black/25">
+        <span className="text-5xl text-char/15 dark:text-white/10" aria-hidden="true">🏺</span>
+        <span className="sr-only">{productName}</span>
+      </div>
+    );
+  }
 
   // Variant image only overrides the active slide, not every slide — prevents all slides showing same variant url
   const getSlideSrc = (img: ProductImage, idx: number) =>

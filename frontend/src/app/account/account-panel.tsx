@@ -42,12 +42,6 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
   const reload = async () => {
     setLoading(true);
     setError(false);
-    const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
-    if (!token) {
-      setError(true);
-      setLoading(false);
-      return;
-    }
     const map: Record<string, string> = {
       orders: "/orders/me",
       addresses: "/users/me/addresses",
@@ -57,6 +51,11 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
     const url = map[section] ?? "/auth/me";
     try {
       const res = await apiFetch(url, { headers: authHeaders() });
+      if (res.status === 401) {
+        // Session really missing/expired → login prompt
+        setError(true);
+        return;
+      }
       if (!res.ok) throw new Error();
       const json = await res.json();
       setData(json);
@@ -107,7 +106,7 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
       ) : loading ? (
         <p className="mt-6 text-ink-soft">در حال بارگذاری…</p>
       ) : section === "profile" ? (
-        <ProfileView data={data as { email: string; full_name: string; phone: string | null; avatar_url: string | null }} avatarUrl={avatarUrl} toast={toast} />
+        <ProfileView data={data as { email: string; full_name: string; phone: string | null; avatar_url: string | null }} avatarUrl={avatarUrl} setAvatarUrl={setAvatarUrl} toast={toast} />
       ) : section === "addresses" ? (
         <AddressesView data={data as Address[]} reload={reload} toast={toast} />
       ) : section === "orders" ? (
@@ -121,13 +120,19 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
   );
 }
 
-function ProfileView({ data, toast, avatarUrl }: { data: { email: string; full_name: string; phone: string | null; avatar_url: string | null }; avatarUrl: string | null; toast: ReturnType<typeof useToast>["toast"] }) {
+/** Convert a base64 data-URL (from the uploader) into a real File for FormData. */
+async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const blob = await (await fetch(dataUrl)).blob();
+  return new File([blob], filename, { type: blob.type || "image/png" });
+}
+
+function ProfileView({ data, toast, avatarUrl, setAvatarUrl }: { data: { email: string; full_name: string; phone: string | null; avatar_url: string | null }; avatarUrl: string | null; setAvatarUrl: (url: string | null) => void; toast: ReturnType<typeof useToast>["toast"] }) {
   const [fullName, setFullName] = useState(data.full_name || "");
   const [phone, setPhone] = useState(data.phone || "");
   const [currentPw, setCurrentPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [saving, setSaving] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -139,15 +144,19 @@ function ProfileView({ data, toast, avatarUrl }: { data: { email: string; full_n
       body.password = newPw;
       body.current_password = currentPw;
     }
-    if (avatarFile) {
+    if (avatarDataUrl) {
       setUploading(true);
-      const formData = new FormData();
-      formData.append("file", avatarFile);
       try {
-        const res = await apiFetch("/avatar/upload", { method: "POST", headers: authHeaders(true), body: formData });
+        // The uploader emits base64 data-URLs → convert to File before upload.
+        const file = await dataUrlToFile(avatarDataUrl, "avatar.png");
+        const formData = new FormData();
+        formData.append("file", file);
+        // NOTE: no manual Content-Type — the browser sets multipart boundary.
+        const res = await apiFetch("/avatar/upload", { method: "POST", body: formData });
         const j = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(j.detail || j.message || " آپلود تصویر شکست خورد");
+        if (!res.ok) throw new Error(j.detail || j.message || "آپلود تصویر شکست خورد");
         setAvatarUrl(j.url);
+        setAvatarDataUrl(null);
         toast("آواتار آپلود شد.", "success");
       } catch (err) {
         toast(getErrorMessage(err), "error");
@@ -155,7 +164,7 @@ function ProfileView({ data, toast, avatarUrl }: { data: { email: string; full_n
         setUploading(false);
       }
     }
-    if (Object.keys(body).length === 0 && !avatarFile) {
+    if (Object.keys(body).length === 0 && !avatarDataUrl) {
       toast("تغییری برای ذخیره وجود ندارد.", "error");
       setSaving(false);
       return;
@@ -183,16 +192,16 @@ function ProfileView({ data, toast, avatarUrl }: { data: { email: string; full_n
         {data.phone && <><p className="mt-4 text-sm text-char-soft">موبایل</p><p dir="ltr" className="font-medium">{data.phone}</p></>}
         {/* Avatar display with fallback to initials */}
         <div className="mt-4 flex items-center gap-3">
-          <div className={cn("h-16 w-16 rounded-full flex items-center justify-center flex-shrink-0", avatarUrl ? "" : "bg-lajvard text-white text-xl")}>
+          <div className={cn("relative h-16 w-16 shrink-0 overflow-hidden rounded-full", avatarUrl ? "" : "flex items-center justify-center bg-lajvard text-xl text-white")}>
             {avatarUrl ? (
-              <Image src={avatarUrl} alt="avatar" fill className="object-cover" />
+              <Image src={mediaUrl(avatarUrl)} alt="avatar" fill sizes="64px" className="object-cover" />
             ) : (
-              <span className="">{fullName ? fullName[0] + fullName.slice(-1)[0] : "?"}</span>
+              <span>{fullName ? fullName[0] + (fullName.slice(-1)[0] ?? "") : "؟"}</span>
             )}
           </div>
           <div>
             <p className="font-medium">{fullName || "—"}</p>
-            <p className="text-xs text-char-soft">برای تغییر آواتار روی 이미เจک کلیک کنید</p>
+            <p className="text-xs text-char-soft">برای تغییر تصویر پروفایل، از بخش پایین استفاده کنید.</p>
           </div>
         </div>
       </div>
@@ -200,11 +209,8 @@ function ProfileView({ data, toast, avatarUrl }: { data: { email: string; full_n
         <Field label="نام کامل"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
         <Field label="موبایل"><Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" pattern="09\d{9}" placeholder="09123456789" /></Field>
         <Upload
-          accept="image/*"
-          onFileChange={(file) => setAvatarFile(file)}
-          disabled={uploading}
-          className="mt-4"
-          placeholder="آپلود عکس آواتار (حداقل ۲ مگابایت)"
+          value={avatarDataUrl}
+          onFileChange={(v) => setAvatarDataUrl(v)}
         />
         <div className="border-t border-char/10 pt-4 dark:border-white/10">
           <p className="mb-3 font-bold">تغییر رمز عبور</p>

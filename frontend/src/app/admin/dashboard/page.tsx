@@ -13,6 +13,7 @@ import {
   CarouselPrevious,
 } from "@/components/admin/kit";
 import { useAdminResource } from "@/lib/admin-hooks";
+import { mediaUrl } from "@/lib/api";
 import { faNum, faPrice, toPersianDigits } from "@/lib/format";
 
 interface DashboardData {
@@ -69,7 +70,7 @@ function ChangePct({ value }: { value: number | null }) {
   return (
     <p className={`mt-1 flex items-center gap-1 text-xs ${up ? "text-firouzeh" : "text-clay"}`}>
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-      {up ? "▲" : "▼"} {faNum(Math.abs(value))}٪ نسبت به دورهٔ قبل
+      {faNum(Math.abs(value))}٪ نسبت به دورهٔ قبل
     </p>
   );
 }
@@ -79,7 +80,7 @@ function ProductCard({ product }: { product: ProductItem }) {
     <div className="glaze-edge rounded-xl p-3 transition-all hover:shadow-lifted">
       <Link href={`/admin/products/${product.id}`} className="flex min-w-0 flex-1 items-center gap-3 hover:text-lajvard">
         {product.image_url ? (
-          <img src={product.image_url} alt={product.name} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
+          <img src={mediaUrl(product.image_url)} alt={product.name} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
         ) : (
           <div className="h-16 w-16 shrink-0 rounded-lg bg-lajvard/10 flex items-center justify-center">
             <Package className="h-6 w-6 text-lajvard dark:text-lajvard-soft" />
@@ -98,7 +99,7 @@ function CategoryCard({ category }: { category: CategoryItem }) {
   return (
     <Link href={`/admin/categories`} className="glaze-edge flex h-24 items-center justify-center rounded-xl border border-char/15 p-3 transition-all hover:shadow-shelf hover:border-lajvard/30 dark:border-white/15">
       {category.image_url ? (
-        <img src={category.image_url} alt={category.name} className="h-full w-full object-cover rounded-lg" />
+        <img src={mediaUrl(category.image_url)} alt={category.name} className="h-full w-full object-cover rounded-lg" />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Package className="h-10 w-10 text-ink-soft" />
@@ -160,7 +161,7 @@ export default function AdminDashboardPage() {
         <Link href="/admin/orders" className="block">
           <StatCard
             label="سفارش‌ها"
-            value={data?.orders ?? 0}
+            value={loading ? "…" : (data?.orders ?? 0)}
             icon={<ShoppingBag className="h-5 w-5" />}
           />
         </Link>

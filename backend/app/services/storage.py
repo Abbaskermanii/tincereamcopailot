@@ -35,6 +35,9 @@ def put_image(object_name: str, content: bytes, content_type: str) -> str:
         len(content),
         content_type=content_type,
     )
+    # Store RELATIVE media URLs. Absolute origins (frontend or backend) break as
+    # soon as the deployment host changes; the frontend mediaUrl() helper prefixes
+    # the correct API origin at render time.
     return f"/api/v1/media/{object_name}"
 
 

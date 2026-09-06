@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Heart, ShoppingBag } from "lucide-react";
+import { Check, Heart, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { useToast } from "@/components/ui/toast-provider";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/local-store";
+import { faNum } from "@/lib/format";
 
 export function AddToCartPanel({
   product,
@@ -116,11 +117,15 @@ export function AddToCartPanel({
             className="h-10 w-full rounded-xl border border-char/15 bg-surface px-3 text-sm dark:border-white/15"
             aria-label="انتخاب گونه"
           >
-            {product.variants.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name} {v.stock_qty <= 0 ? "(ناموجود)" : ""} {v.absolute_price !== null ? `— ${v.absolute_price}` : v.price_delta !== 0 ? `(${v.price_delta > 0 ? "+" : ""}${v.price_delta})` : ""}
-              </option>
-            ))}
+            {product.variants.map((v) => {
+              const vp = v.absolute_price !== null ? Number(v.absolute_price) : product.price + Number(v.price_delta);
+              return (
+                <option key={v.id} value={v.id} disabled={v.stock_qty <= 0}>
+                  {v.name}
+                  {v.stock_qty <= 0 ? " (ناموجود)" : ` — ${faNum(vp)} تومان`}
+                </option>
+              );
+            })}
           </select>
         )}
         <Button size="lg" disabled={outOfStock} onClick={handleAdd} className="w-full">
@@ -134,36 +139,58 @@ export function AddToCartPanel({
   return (
     <div className="space-y-4">
       {product.variants && product.variants.length > 0 && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">گونه</label>
-          <div className="grid gap-2 sm:grid-cols-2">
+        <fieldset className="space-y-2">
+          <legend className="mb-1 text-sm font-medium">
+            انتخاب گونه
+            <span className="mr-1.5 text-xs font-normal text-char-soft dark:text-ink-soft">
+              ({faNum(product.variants.length)} گزینه)
+            </span>
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="گونه محصول">
             {product.variants.map((v) => {
               const isSelected = v.id === selectedVariantId;
               const varPrice = v.absolute_price !== null ? Number(v.absolute_price) : product.price + Number(v.price_delta);
+              const soldOut = v.stock_qty <= 0;
               return (
                 <button
                   key={v.id}
                   type="button"
-                  onClick={() => setSelectedVariantId(v.id)}
-                  disabled={v.stock_qty <= 0}
-                  className={`rounded-xl border p-3 text-right text-sm transition ${isSelected ? "border-lajvard bg-lajvard/10 dark:border-lajvard-soft dark:bg-lajvard-soft/10" : "border-char/15 bg-surface hover:border-char/30 dark:border-white/15"} ${v.stock_qty <= 0 ? "opacity-50" : ""}`}
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => !soldOut && setSelectedVariantId(v.id)}
+                  disabled={soldOut}
+                  className={`relative rounded-xl border-2 p-3 text-right transition-all ${
+                    isSelected
+                      ? "border-lajvard bg-lajvard/5 dark:border-lajvard-soft dark:bg-lajvard-soft/10"
+                      : "border-char/15 bg-surface hover:border-char/35 dark:border-white/15"
+                  } ${soldOut ? "cursor-not-allowed opacity-50" : ""}`}
                 >
-                  <div className="font-medium">{v.name}</div>
-                  <div className="num-latin mt-1 text-xs text-char-soft dark:text-ink-soft">
-                    {varPrice.toLocaleString("fa-IR")} تومان {v.stock_qty > 0 ? `— ${v.stock_qty} موجود` : "— ناموجود"}
-                  </div>
+                  {isSelected && (
+                    <span className="absolute left-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-lajvard text-white dark:bg-lajvard-soft dark:text-char">
+                      <Check size={11} strokeWidth={3} />
+                    </span>
+                  )}
+                  <span className="block pr-5 font-medium">{v.name}</span>
+                  <span className="mt-1 block text-xs text-char-soft dark:text-ink-soft">
+                    {soldOut ? (
+                      <span className="font-bold text-clay">ناموجود</span>
+                    ) : (
+                      <>
+                        {faNum(varPrice)} تومان
+                        {v.stock_qty <= 5 && <span className="mr-1.5 text-clay">— فقط {faNum(v.stock_qty)} عدد</span>}
+                      </>
+                    )}
+                  </span>
                 </button>
               );
             })}
           </div>
-        </div>
+        </fieldset>
       )}
       <div className="flex items-center gap-3">
         <QuantityStepper value={qty} onChange={setQty} max={Math.max(effectiveStock, 1)} />
         {!outOfStock && effectiveStock <= 5 && (
-          <span className="text-xs font-medium text-clay">
-            فقط {new Intl.NumberFormat("fa-IR").format(effectiveStock)} عدد در انبار
-          </span>
+          <span className="text-xs font-medium text-clay">فقط {faNum(effectiveStock)} عدد در انبار</span>
         )}
       </div>
 

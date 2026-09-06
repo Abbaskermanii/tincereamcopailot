@@ -29,7 +29,7 @@ interface ProductSchema {
   description: string;
   offers: {
     "@type": "Offer";
-    price: number;
+    price: number | string;
     priceCurrency: string;
     availability: string;
     url: string;

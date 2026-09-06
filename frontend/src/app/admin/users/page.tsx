@@ -4,6 +4,7 @@ import { useState } from "react";
 import { User, Shield, Mail, Phone, MapPin, Activity, ExternalLink, ChevronDown, Plus, Settings } from "lucide-react";
 import { ConfirmDialog, DataTable, EmptyState, Field, FormActions, Modal, PageHeader, Pagination, StatusBadge, Toolbar, Toggle } from "@/components/admin/kit";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
+import { mediaUrl } from "@/lib/api";
 import { toPersianDigits, faNum } from "@/lib/format";
 
 interface User {
@@ -221,7 +222,7 @@ export default function AdminUsersPage() {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     {r.avatar_url ? (
-                      <img src={r.avatar_url} alt={r.full_name} className="h-10 w-10 rounded-full object-cover ring-2 ring-slip" />
+                      <img src={mediaUrl(r.avatar_url)} alt={r.full_name} className="h-10 w-10 rounded-full object-cover ring-2 ring-slip" />
                     ) : (
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slip ring-2 ring-slip">
                         <User className="h-5 w-5 text-ink" />
