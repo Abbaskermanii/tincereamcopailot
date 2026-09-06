@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { NewsletterForm } from "./newsletter-form";
 
 const FIXED_COLS = [
   {
@@ -31,10 +30,10 @@ export async function Footer() {
     <footer className="mt-24 border-t border-char/10 bg-surface dark:border-white/10 dark:bg-black/20">
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-4 py-14 md:grid-cols-4 md:px-6">
         <div className="col-span-2 md:col-span-1">
-          <p className="text-xl font-extrabold">تن‌سِرام</p>
+          <p className="text-xl font-extrabold">آنیمور سرام</p>
           <p className="mt-3 max-w-xs text-sm leading-7 text-char-soft dark:text-ink-soft">
-            کارگاه سفال و سرامیک دست‌ساز؛ هر تکه روی چرخ شکل می‌گیرد، با دست لعاب
-            می‌خورد و در کوره‌ای که خودمان چیده‌ایم پخته می‌شود.
+            تولیدکنندهٔ سفال و سرامیک دست‌ساز در کرج؛ هر قطعه روی چرخ شکل می‌گیرد،
+            با دست لعاب می‌خورد و در کورهٔ کارگاه خودمان پخته می‌شود — بدون واسطه، مستقیم به خانهٔ شما.
           </p>
           {/* Social links — update hrefs with real accounts */}
           <div className="mt-4 flex gap-3">
@@ -53,7 +52,7 @@ export async function Footer() {
           <ul className="space-y-2">
             {categories.map((c) => (
               <li key={c.slug}>
-                <Link href={`/category/${c.slug}`} className="text-sm text-char-soft transition-colors hover:text-lajvard dark:text-ink-soft dark:hover:text-lajvard-soft">
+                <Link href={`/shop?category=${c.slug}`} className="text-sm text-char-soft transition-colors hover:text-lajvard dark:text-ink-soft dark:hover:text-lajvard-soft">
                   {c.name}
                 </Link>
               </li>
@@ -84,11 +83,8 @@ export async function Footer() {
           </nav>
         ))}
       </div>
-      <div className="mx-auto max-w-7xl border-t border-char/10 px-4 py-8 md:px-6">
-        <NewsletterForm />
-      </div>
       <div className="border-t border-char/10 py-5 text-center text-xs text-char-soft dark:border-white/10 dark:text-ink-soft">
-        © ۱۴۰۵ کارگاه تن‌سِرام — همهٔ حقوق محفوظ است.
+        © ۱۴۰۵ کارگاه آنیمور سرام — همهٔ حقوق محفوظ است.
       </div>
     </footer>
   );

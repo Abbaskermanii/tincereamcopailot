@@ -6,31 +6,35 @@ import Image from "next/image";
 import { faPrice } from "@/lib/format";
 import { mediaUrl } from "@/lib/api";
 import { SectionHeading } from "@/components/ui/section-heading";
+import { SmartCarousel } from "@/components/ui/smart-carousel";
+
+const MAX_ITEMS = 8;
 
 export function RecentlyViewed({ excludeSlug }: { excludeSlug?: string }) {
-  const items = useRecentlyViewed(excludeSlug);
+  const all = useRecentlyViewed(excludeSlug);
+  const items = all.slice(0, MAX_ITEMS);
   if (items.length === 0) return null;
 
   return (
     <section aria-labelledby="rv-h" className="mt-16">
       <SectionHeading title="بازدیدهای اخیر شما" />
-      <div id="rv-h" className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2">
+      <SmartCarousel minCardWidth={220} maxCardWidth={260} gap={16}>
         {items.map((r) => (
           <Link
             key={r.slug}
             href={`/product/${r.slug}`}
-            className="glaze-edge w-40 shrink-0 overflow-hidden rounded-wobble bg-surface p-2 shadow-shelf"
+            className="glaze-edge flex h-full w-full flex-col overflow-hidden rounded-wobble-card bg-surface p-2 shadow-shelf transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lifted"
           >
             <div className="relative aspect-square overflow-hidden rounded-xl bg-slip dark:bg-surface">
               {r.imageUrl && (
-                <Image src={mediaUrl(r.imageUrl)} alt={r.name} fill sizes="160px" className="object-cover" />
+                <Image src={mediaUrl(r.imageUrl)} alt={r.name} fill sizes="240px" className="object-cover" />
               )}
             </div>
             <p className="line-clamp-1 pt-2 text-sm font-medium">{r.name}</p>
-            <p className="text-xs text-char-soft dark:text-ink-soft">{faPrice(r.price)}</p>
+            <p className="pb-1 text-xs text-char-soft dark:text-ink-soft">{faPrice(r.price)}</p>
           </Link>
         ))}
-      </div>
+      </SmartCarousel>
     </section>
   );
 }

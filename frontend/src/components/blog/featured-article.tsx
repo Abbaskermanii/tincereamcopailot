@@ -35,7 +35,7 @@ export function FeaturedArticle({ article }: { article: FeaturedArticleData }) {
   return (
     <Link
       href={`/blog/${article.slug}`}
-      className="group relative flex min-h-[400px] flex-col justify-end overflow-hidden rounded-2xl bg-char md:min-h-[480px]"
+      className="group relative flex min-h-[400px] flex-col justify-end overflow-hidden rounded-wobble-card bg-char md:min-h-[480px]"
     >
       {img ? (
         <Image

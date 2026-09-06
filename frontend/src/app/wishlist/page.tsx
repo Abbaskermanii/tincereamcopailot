@@ -102,14 +102,14 @@ export default function WishlistPage() {
 
   const shareWishlist = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
-    const text = `لیست علاقه‌مندی‌های من در تن‌سِرام — ${items.length} محصول`;
+    const text = `لیست علاقه‌مندی‌های من در آنیمور سرام — ${items.length} محصول`;
     if (navigator.share) {
       try {
         await navigator.share({ title: text, url });
       } catch {}
     } else if (navigator.clipboard) {
       await navigator.clipboard.writeText(`${text}\n${url}`);
-      toast({ title: "لینک کپی شد", variant: "success" });
+      toast("لینک کپی شد", "success");
     }
   };
 
@@ -151,9 +151,9 @@ export default function WishlistPage() {
                     try {
                       const { apiFetch } = await import("@/lib/api-client");
                       await apiFetch("/cart/items", { method: "POST", body: JSON.stringify({ product_id: p.id, quantity: 1 }) });
-                      toast({ title: "به سبد اضافه شد", variant: "success" });
+                      toast("به سبد اضافه شد", "success");
                     } catch {
-                      toast({ title: "خطا در افزودن به سبد", variant: "error" });
+                      toast("خطا در افزودن به سبد", "error");
                     }
                   }}
                   className="rounded-xl bg-firouzeh/90 p-1.5 text-white backdrop-blur hover:bg-firouzeh"

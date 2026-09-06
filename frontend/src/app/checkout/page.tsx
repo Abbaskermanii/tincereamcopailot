@@ -296,7 +296,7 @@ export default function CheckoutPage() {
                 className="h-5 w-5 accent-[#31547A]"
               />
               <Gift size={18} className="text-clay" />
-              بسته‌بندی هدیه (+{faPrice(GIFT_FEE)})
+              بسته‌بندی هدیه (+{faPrice(giftFee)})
             </label>
             {giftWrap && (
               <div className="mt-3">

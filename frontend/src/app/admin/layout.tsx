@@ -4,13 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  BarChart3, Boxes, ChevronDown, FolderTree, Home, Image as ImageIcon,
-  LayoutDashboard, LogOut, Megaphone, Menu, MessageSquare,
-  Navigation, Package, ReceiptText, RotateCcw, ScrollText, Settings, ShieldCheck,
-  ShoppingBag, Star, Tags, Ticket, Truck, Users, X, HelpCircle,
+  ChevronDown, FolderTree, Image as ImageIcon,
+  LayoutDashboard, LogOut, Menu, MessageSquare,
+  Package, ReceiptText, RotateCcw, ScrollText, ShieldCheck,
+  Star, Ticket, Truck, Users, X, HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+import { AdminSearchModal } from "./admin-search-modal";
+import { Search, ShoppingBag } from "lucide-react";
 
 type NavLeaf = { label: string; href: string; icon: React.ComponentType<{ className?: string }> };
 type NavGroup = { label: string; items: NavLeaf[] };
@@ -20,17 +22,13 @@ const NAV: NavGroup[] = [
     label: "نمای کلی",
     items: [
       { label: "داشبورد", href: "/admin/dashboard", icon: LayoutDashboard },
-      { label: "تحلیل‌ها", href: "/admin/analytics", icon: BarChart3 },
     ],
   },
   {
     label: "فروشگاه",
     items: [
-      { label: "صفحهٔ اصلی", href: "/admin/homepage", icon: Home },
       { label: "محصولات", href: "/admin/products", icon: Package },
       { label: "دسته‌بندی‌ها", href: "/admin/categories", icon: FolderTree },
-      { label: "برندها", href: "/admin/brands", icon: Tags },
-      { label: "هشدار موجودی", href: "/admin/stock-alerts", icon: Boxes },
     ],
   },
   {
@@ -39,9 +37,7 @@ const NAV: NavGroup[] = [
       { label: "مقالات", href: "/admin/articles", icon: ScrollText },
       { label: "دستهٔ مقالات", href: "/admin/article-categories", icon: FolderTree },
       { label: "سوالات رایج", href: "/admin/faq", icon: HelpCircle },
-      { label: "صفحات", href: "/admin/pages", icon: ScrollText },
       { label: "بنرهای اسلایدری", href: "/admin/carousels", icon: ImageIcon },
-      { label: "مدیریت منوها", href: "/admin/navigation", icon: Navigation },
     ],
   },
   {
@@ -50,7 +46,6 @@ const NAV: NavGroup[] = [
       { label: "سفارش‌ها", href: "/admin/orders", icon: ReceiptText },
       { label: "مرجوعی‌ها", href: "/admin/returns", icon: RotateCcw },
       { label: "کدهای تخفیف", href: "/admin/coupons", icon: Ticket },
-      { label: "کمپین‌ها", href: "/admin/campaigns", icon: Megaphone },
       { label: "روش‌های ارسال", href: "/admin/shipping", icon: Truck },
     ],
   },
@@ -66,9 +61,6 @@ const NAV: NavGroup[] = [
   {
     label: "سیستم",
     items: [
-      { label: "تنظیمات", href: "/admin/settings", icon: Settings },
-      { label: "اعلان‌ها", href: "/admin/notifications", icon: Megaphone },
-      { label: "فعالیت‌ها", href: "/admin/activity", icon: ShoppingBag },
       { label: "نقش‌ها و دسترسی‌ها", href: "/admin/roles", icon: ShieldCheck },
     ],
   },
@@ -101,18 +93,21 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       href={item.href}
                       onClick={onNavigate}
                       className={cn(
-                        "glaze-edge group flex min-h-[40px] items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200",
+                        "group relative flex min-h-[42px] items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200",
                         active
-                          ? "is-active bg-lajvard text-white shadow-shelf dark:bg-lajvard-soft dark:text-char"
-                          : "text-char-soft hover:bg-char/5 hover:shadow-shelf dark:text-ink-soft dark:hover:bg-white/10",
+                          ? "bg-lajvard font-bold text-white shadow-shelf dark:bg-lajvard-soft dark:text-char"
+                          : "text-char-soft hover:bg-char/5 hover:text-char dark:text-ink-soft dark:hover:bg-white/10 dark:hover:text-white",
                       )}
                       aria-current={active ? "page" : undefined}
                     >
                       <Icon className={cn(
                         "h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110",
-                        active ? "text-white dark:text-char" : "text-ink-soft",
+                        active ? "text-white dark:text-char" : "text-char-soft dark:text-ink-soft",
                       )} />
-                      {item.label}
+                      <span className="truncate">{item.label}</span>
+                      {active && (
+                        <span aria-hidden="true" className="absolute inset-y-2 right-0 w-1 rounded-full bg-white/60 dark:bg-char/50" />
+                      )}
                     </Link>
                   </li>
                 );
@@ -129,6 +124,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, isAdmin, loading, logout } = useAuth();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) router.replace("/auth?next=/admin/dashboard");
@@ -150,7 +146,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-l border-char/10 bg-surface dark:border-white/10 dark:bg-surface lg:flex">
         <div className="border-b border-char/10 p-5 dark:border-white/10">
-          <Link href="/" className="text-lg font-extrabold tracking-tight">تن‌سِرام</Link>
+          <Link href="/" className="text-lg font-extrabold tracking-tight">آنیمور سرام</Link>
           <p className="mt-0.5 text-xs text-ink-soft">پنل مدیریت فروشگاه</p>
         </div>
         <SidebarContent />
@@ -197,7 +193,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Main column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex min-h-[56px] items-center gap-3 border-b border-char/10 bg-surface/90 px-4 py-2 backdrop-blur-lg dark:border-white/10 dark:bg-surface/90 lg:hidden">
+        <header className="sticky top-0 z-40 flex min-h-[56px] items-center gap-2 border-b border-char/10 bg-surface/90 px-4 py-2 backdrop-blur-lg dark:border-white/10 dark:bg-surface/90 lg:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
@@ -206,10 +202,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Menu className="h-5 w-5" />
           </button>
-          <Link href="/admin/dashboard" className="font-extrabold">تن‌سِرام · ادمین</Link>
+          <Link href="/admin/dashboard" className="min-w-0 flex-1 truncate font-extrabold">آنیمور سرام · ادمین</Link>
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-char/5 dark:hover:bg-white/10"
+            aria-label="جست‌وجو"
+          >
+            <Search className="h-5 w-5" />
+          </button>
+          <Link
+            href="/cart"
+            className="flex h-11 w-11 items-center justify-center rounded-xl transition-colors hover:bg-char/5 dark:hover:bg-white/10"
+            aria-label="سبد خرید فروشگاه"
+          >
+            <ShoppingBag className="h-5 w-5" />
+          </Link>
         </header>
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 lg:py-8">{children}</main>
       </div>
+
+      <AdminSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

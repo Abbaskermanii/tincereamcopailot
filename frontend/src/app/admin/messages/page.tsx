@@ -72,7 +72,7 @@ export default function AdminMessagesPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((m) => (
-            <div key={m.id} className={`glaze-edge rounded-wobble p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted ${m.is_read ? "bg-surface" : "bg-lajvard/5 dark:bg-lajvard-soft/5"}`}>
+            <div key={m.id} className={`glaze-edge rounded-wobble-card p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted ${m.is_read ? "bg-surface" : "bg-lajvard/5 dark:bg-lajvard-soft/5"}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">

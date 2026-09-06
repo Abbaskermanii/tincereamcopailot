@@ -3,7 +3,7 @@ import { CmsPage } from "@/components/cms/cms-page";
 
 export const metadata: Metadata = {
   title: "حریم خصوصی",
-  description: "سیاست حفظ حریم خصوصی و داده‌های مشتریان فروشگاه تن‌سِرام.",
+  description: "سیاست حفظ حریم خصوصی و داده‌های مشتریان فروشگاه آنیمور سرام.",
 };
 
 export default function PrivacyPolicyPage() {

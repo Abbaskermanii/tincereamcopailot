@@ -9,12 +9,9 @@ interface EmptyStateProps {
   title: string;
   description?: string;
   icon?: React.ReactNode;
-  action?: {
-    label: string;
-    href?: string;
-    onClick?: () => void;
-    variant?: "primary" | "secondary";
-  };
+  action?:
+    | { label: string; href?: string; onClick?: () => void; variant?: "primary" | "secondary" }
+    | React.ReactNode;
   className?: string;
 }
 
@@ -50,7 +47,8 @@ export function EmptyState({
         </p>
       )}
 
-      {action && (
+      {action && React.isValidElement(action) && <>{action}</>}
+      {action && !React.isValidElement(action) && (
         <div className="flex gap-2">
           {action.onClick ? (
             <button

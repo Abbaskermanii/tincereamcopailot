@@ -55,16 +55,16 @@ export function ArticleCard({ article }: { article: ArticleCardData }) {
   return (
     <Link
       href={`/blog/${article.slug}`}
-      className="group glaze-edge flex h-full flex-col overflow-hidden rounded-wobble bg-surface transition-all duration-300 hover:shadow-lifted dark:bg-[#262320]"
+      className="group glaze-edge flex h-full w-full flex-col overflow-hidden rounded-wobble-card hover:-translate-y-0.5 bg-surface shadow-shelf transition-all duration-300 hover:border-lajvard/40 hover:shadow-lifted dark:bg-[#262320] dark:hover:border-lajvard-soft/40 border border-transparent"
     >
-      {/* Image — fixed aspect ratio */}
-      <div className="relative aspect-[16/10] shrink-0 overflow-hidden bg-slip dark:bg-char">
+      {/* Image — same aspect as ProductCard so card sizes match site-wide */}
+      <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-surface dark:bg-[#1c1a18]">
         {img ? (
           <Image
             src={img}
             alt={article.title}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -83,23 +83,23 @@ export function ArticleCard({ article }: { article: ArticleCardData }) {
       </div>
 
       {/* Content — flex-col with fixed structure */}
-      <div className="flex min-h-0 flex-1 flex-col p-3">
+      <div className="flex min-h-0 flex-1 flex-col px-3 py-2.5">
         {/* Title — exactly 2 lines, fixed min-height */}
-        <h3 className="mb-1.5 line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-[1.25] text-char-800 transition-colors group-hover:text-lajvard dark:text-white/90 dark:group-hover:text-lajvard-soft">
+        <h3 className="mb-1.5 line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-[1.3] [overflow-wrap:anywhere] text-char-800 transition-colors group-hover:text-lajvard dark:text-white/90 dark:group-hover:text-lajvard-soft">
           {article.title}
         </h3>
 
         {/* Excerpt — exactly 2 lines, fixed min-height */}
-        <div className="mb-2 h-10">
+        <div className="mb-2 min-h-10">
           {article.excerpt ? (
-            <p className="line-clamp-2 text-[11px] leading-5 text-char-soft dark:text-white/45">
+            <p className="line-clamp-2 text-[11px] leading-5 text-char-soft [overflow-wrap:anywhere] dark:text-white/45">
               {article.excerpt}
             </p>
           ) : null}
         </div>
 
         {/* Meta — pinned to bottom */}
-        <div className="mt-auto flex items-center gap-2 text-[9px] text-char-soft dark:text-white/40">
+        <div className="mt-auto flex items-center gap-2 text-[10px] text-char-soft dark:text-white/40">
           {article.author_name && (
             <span className="flex items-center gap-1">
               <AuthorAvatar name={article.author_name} avatarUrl={article.author_avatar_url} />
@@ -108,13 +108,13 @@ export function ArticleCard({ article }: { article: ArticleCardData }) {
           )}
           {article.published_at && (
             <span className="flex items-center gap-0.5">
-              <Calendar className="h-2.5 w-2.5" />
+              <Calendar className="h-3 w-3" />
               {formatDate(article.published_at)}
             </span>
           )}
           {article.reading_time_minutes != null && (
             <span className="flex items-center gap-0.5">
-              <Clock className="h-2.5 w-2.5" />
+              <Clock className="h-3 w-3" />
               {article.reading_time_minutes} دقیقه
             </span>
           )}

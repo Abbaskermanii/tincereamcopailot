@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Breadcrumbs } from "@/components/ui/breadcrumbs";
+import { ShieldCheck, Truck, HandHeart } from "lucide-react";
+import { BreadcrumbNav } from "@/components/ui/breadcrumbs";
 import { Badge } from "@/components/ui/badge";
 import { PriceTag } from "@/components/ui/price-tag";
 import { ProductGallery } from "@/components/store/product-gallery";
@@ -47,6 +48,15 @@ interface Product {
   sku?: string;
   primary_image_url?: string | null;
   category_slug?: string | null;
+  category_name?: string | null;
+}
+
+function sanitizeDescription(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/ on[a-z]+="[^"]*"/gi, "")
+    .replace(/ on[a-z]+='[^']*'/gi, "");
 }
 
 export function ProductView({ product }: { product: Product }) {
@@ -83,11 +93,14 @@ export function ProductView({ product }: { product: Product }) {
 
   return (
     <>
-      <Breadcrumbs
+      <BreadcrumbNav
         items={[
-          { name: "خانه", href: "/" },
-          { name: product.category_slug ? product.category_slug : "محصول", href: product.category_slug ? `/category/${product.category_slug}` : "/shop" },
-          { name: product.name },
+          { label: "خانه", href: "/" },
+          {
+            label: product.category_name || "فروشگاه",
+            href: product.category_slug ? `/shop?category=${product.category_slug}` : "/shop",
+          },
+          { label: product.name },
         ]}
       />
 
@@ -98,6 +111,14 @@ export function ProductView({ product }: { product: Product }) {
 
         <div id="buy-box" className="space-y-6">
           <div>
+            {product.category_name && (
+              <a
+                href={`/shop?category=${product.category_slug}`}
+                className="mb-2 inline-block rounded-full bg-lajvard/8 px-3 py-1 text-[11px] font-bold text-lajvard transition-colors hover:bg-lajvard/15 dark:bg-lajvard-soft/15 dark:text-lajvard-soft"
+              >
+                {product.category_name}
+              </a>
+            )}
             <h1 className="text-2xl font-extrabold leading-snug md:text-3xl">
               {product.name}
               {selectedVariant && <span className="mr-2 text-lg font-medium text-char-soft">— {selectedVariant.name}</span>}
@@ -135,7 +156,21 @@ export function ProductView({ product }: { product: Product }) {
             onVariantSelect={handleVariantSelect}
           />
 
-          <dl className="space-y-3 rounded-wobble bg-surface p-5 text-sm shadow-shelf">
+          {/* Trust chips */}
+          <div className="grid grid-cols-3 gap-2 rounded-wobble-card border border-char/10 bg-surface p-3 dark:border-white/10 dark:bg-[#262320]">
+            {[
+              { icon: HandHeart, label: "دست‌ساز و تک‌نسخه" },
+              { icon: ShieldCheck, label: "بسته‌بندی ایمن" },
+              { icon: Truck, label: "ارسال سراسر ایران" },
+            ].map((t) => (
+              <div key={t.label} className="flex flex-col items-center gap-1.5 text-center">
+                <t.icon className="h-5 w-5 text-kiln-clay dark:text-clay-soft" strokeWidth={1.6} />
+                <span className="text-[10px] font-bold text-char-soft dark:text-white/55">{t.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <dl className="space-y-3 rounded-wobble-card bg-surface p-5 text-sm shadow-shelf dark:bg-black/25">
             {[
               ["جنس", product.material],
               ["ابعاد", product.dimensions],
@@ -150,12 +185,15 @@ export function ProductView({ product }: { product: Product }) {
               ))}
           </dl>
 
-          <details className="group rounded-wobble bg-surface p-5" open>
+          <details className="group rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25" open>
             <summary className="cursor-pointer list-none font-bold">توضیحات کامل</summary>
-            <p className="mt-3 whitespace-pre-line text-sm leading-8 text-char-soft dark:text-ink-soft">{product.description}</p>
+            <div
+              className="article-body mt-3 text-sm"
+              dangerouslySetInnerHTML={{ __html: sanitizeDescription(product.description ?? "") }}
+            />
           </details>
 
-          <details className="rounded-wobble bg-surface p-5">
+          <details className="rounded-wobble-card bg-surface p-5 shadow-shelf dark:bg-black/25">
             <summary className="cursor-pointer list-none font-bold">نگهداری و ارسال</summary>
             <ul className="mt-3 list-inside list-disc space-y-1.5 text-sm leading-7 text-char-soft dark:text-ink-soft">
               <li>شست‌وشو با دست و اسفنج نرم؛ برای ماشین ظرفشویی مناسب نیست.</li>

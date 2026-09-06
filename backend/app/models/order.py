@@ -55,7 +55,5 @@ class Order(UUIDMixin, TimestampMixin, table=True):
     tracking_code: str | None = Field(default=None, max_length=64, index=True)
     carrier: str | None = Field(default=None, max_length=64)
     admin_note: str | None = Field(default=None, max_length=1024)
-    campaign_id: str | None = Field(default=None, foreign_key="campaigns.id")
-    campaign_discount_amount: float = 0
 
     items: list["OrderItem"] = Relationship(back_populates="order")

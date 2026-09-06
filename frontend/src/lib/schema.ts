@@ -1,7 +1,7 @@
 /** JSON-LD structured data generators for SEO */
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-const STORE_NAME = "تن‌سِرام";
+const STORE_NAME = "آنیمور سرام";
 
 export interface ProductSchema {
   name: string;

@@ -10,19 +10,16 @@ from sqlmodel import Session, select
 
 from app.core.config import get_settings
 from app.db.session import get_session
-from app.models import NewsletterSubscription, User, PasswordResetToken
+from app.models import User, PasswordResetToken
 from app.services.notifier import RTL_EMAIL_SHELL, send_email
 
 router = APIRouter(prefix="/email", tags=["email"])
-
 
 class EmailResponse(BaseModel):
     success: bool
     message: str
 
-
 # ───────────────────────── Password Reset ─────────────────────────
-
 
 @router.post("/password-reset")
 def request_password_reset(email: str, session: Session = Depends(get_session)):
@@ -50,9 +47,7 @@ def request_password_reset(email: str, session: Session = Depends(get_session)):
     )
     return EmailResponse(success=True, message="لینک بازیابی رمز عبور ارسال شد.")
 
-
 # ───────────────────────── Order Confirmation ─────────────────────────
-
 
 @router.post("/order-confirmation")
 def send_order_confirmation(order_id: str, session: Session = Depends(get_session)):
@@ -80,9 +75,7 @@ def send_order_confirmation(order_id: str, session: Session = Depends(get_sessio
     )
     return EmailResponse(success=True, message="ایمیل تأیید سفارش ارسال شد.")
 
-
 # ───────────────────────── Order Status Update ─────────────────────────
-
 
 @router.post("/order-update")
 def send_order_update(order_id: str, new_status: str, status_message: str = "", session: Session = Depends(get_session)):
@@ -111,9 +104,7 @@ def send_order_update(order_id: str, new_status: str, status_message: str = "", 
     )
     return EmailResponse(success=True, message="ایمیل بروزرسانی ارسال شد.")
 
-
 # ───────────────────────── Welcome ─────────────────────────
-
 
 @router.post("/welcome")
 def send_welcome_email(user_id: str, session: Session = Depends(get_session)):
@@ -134,48 +125,5 @@ def send_welcome_email(user_id: str, session: Session = Depends(get_session)):
     )
     return EmailResponse(success=True, message="ایمیل خوش‌آمدگویی ارسال شد.")
 
-
 # ───────────────────────── Newsletter Subscribe ─────────────────────────
 
-
-class NewsletterSubscribeRequest(BaseModel):
-    email: str = Field(..., min_length=5, max_length=255)
-
-
-@router.post("/newsletter-subscribe", response_model=EmailResponse)
-def subscribe_newsletter(payload: NewsletterSubscribeRequest, session: Session = Depends(get_session)):
-    existing = session.exec(select(NewsletterSubscription).where(NewsletterSubscription.email == payload.email)).first()
-    if existing:
-        if existing.unsubscribed_at:
-            existing.unsubscribed_at = None
-            existing.consent = True
-            session.add(existing)
-            session.commit()
-            return EmailResponse(success=True, message="عضویت شما مجدداً فعال شد.")
-        return EmailResponse(success=True, message="این ایمیل قبلاً عضو شده است.")
-
-    session.add(NewsletterSubscription(email=payload.email, consent=True))
-    session.commit()
-
-    body = f"""
-    <h2>عضویت در خبرنامه</h2>
-    <p>شما با موفقیت در خبرنامه تن‌سِرام عضو شدید.</p>
-    <p>جدیدترین محصولات و تخفیف‌ها را در ایمیل خود دریافت خواهید کرد.</p>
-    """
-    import asyncio
-    asyncio.get_event_loop().run_until_complete(
-        send_email(payload.email, "عضویت در خبرنامه — تن‌سِرام", RTL_EMAIL_SHELL.format(body=body))
-    )
-    return EmailResponse(success=True, message="عضویت شما تأیید شد.")
-
-
-@router.delete("/newsletter-subscribe/{email}", response_model=EmailResponse)
-def unsubscribe_newsletter(email: str, session: Session = Depends(get_session)):
-    row = session.exec(select(NewsletterSubscription).where(NewsletterSubscription.email == email)).first()
-    if not row:
-        return EmailResponse(success=True, message="این ایمیل در خبرنامه ثبت نشده.")
-    row.unsubscribed_at = datetime.now(UTC)
-    row.consent = False
-    session.add(row)
-    session.commit()
-    return EmailResponse(success=True, message="عضویت شما لغو شد.")

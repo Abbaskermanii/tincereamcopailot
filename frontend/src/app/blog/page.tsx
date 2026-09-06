@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ChevronLeft, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FeaturedArticle } from "@/components/blog/featured-article";
@@ -11,8 +12,10 @@ import { ArticleCard } from "@/components/blog/article-card";
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "مجله تن‌سِرام | ایده‌ها، داستان‌ها و چیزهایی که ارزش خواندن دارند",
-  description: "مجله تخصصی سفال و سرامیک — مقالات، راهنماها و داستان‌هایی از دنیای هنر سفالگری",
+  title: "مجله آنیمور سرام | ایده‌ها، داستان‌ها و چیزهایی که ارزش خواندن دارند",
+  description:
+    "مجله تخصصی سفال و سرامیک — مقالات، راهنماها و داستان‌هایی از دنیای هنر سفالگری و کارگاه آنیمور سرام.",
+  alternates: { canonical: "/blog" },
 };
 
 interface ArticleItem {
@@ -38,7 +41,7 @@ export default async function BlogPage({
 
   const activeCategory = searchParams?.category;
   const currentPage = Math.max(1, Number(searchParams?.page ?? 1));
-  const PAGE_SIZE = 8;
+  const PAGE_SIZE = 9;
 
   let filtered = allArticles;
   if (activeCategory) {
@@ -55,7 +58,7 @@ export default async function BlogPage({
   const totalPages = Math.ceil(restArticles.length / PAGE_SIZE);
   const paginatedArticles = restArticles.slice(
     (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
+    currentPage * PAGE_SIZE,
   );
 
   const popular = [...allArticles]
@@ -71,39 +74,71 @@ export default async function BlogPage({
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
-      <section className="border-b border-char/5 bg-gradient-to-b from-char/[0.02] to-transparent px-4 py-12 md:px-6 md:py-16 dark:from-white/[0.01]">
-        <div className="mx-auto max-w-6xl">
-          <h1 className="text-4xl font-extrabold tracking-tight text-char md:text-5xl lg:text-6xl dark:text-white">
-            مجله
+      {/* Editorial hero */}
+      <section className="relative overflow-hidden border-b border-char/5 px-4 py-14 md:px-6 md:py-20 dark:border-white/5">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-kiln-clay/10 dark:border-clay-soft/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full border border-lajvard/10 dark:border-lajvard-soft/10" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-24 left-1/4 h-72 w-72 rounded-full bg-kiln-clay/5 blur-3xl dark:bg-clay-soft/5" />
+
+        <div className="relative mx-auto max-w-6xl">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-kiln-clay/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.25em] text-kiln-clay dark:bg-clay-soft/15 dark:text-clay-soft md:text-xs">
+            <Sparkles className="h-3.5 w-3.5" />
+            مجله آنیمور سرام
+          </span>
+          <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-tight text-char md:text-5xl lg:text-6xl dark:text-white">
+            داستان‌ها از دنیای
+            <span className="text-kiln-clay dark:text-clay-soft"> خاک و آتش</span>
           </h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-char-soft md:text-lg dark:text-white/50">
-            ایده‌ها، داستان‌ها و چیزهایی که ارزش خواندن دارند.
+          <p className="mt-4 max-w-2xl text-base leading-8 text-char-soft md:text-lg md:leading-9 dark:text-white/50">
+            ایده‌ها، راهنماها و قصه‌هایی از کارگاه سفالگری؛ چیزهایی که ارزش خواندن دارند.
           </p>
 
-          <div className="mt-6">
+          <div className="mt-8">
             <ArticleCategoryNav categories={categories} activeCategory={activeCategory} />
           </div>
         </div>
       </section>
 
       <div className="mx-auto max-w-6xl px-4 md:px-6">
-        {/* Lead Story + Secondary */}
+        {/* Lead story + headline column (Bloomberg-style split) */}
         {filtered.length > 0 && (
           <section className="py-8 md:py-12">
-            {leadArticle && (
-              <div className="mb-6 md:mb-8">
-                <FeaturedArticle article={leadArticle} />
-              </div>
-            )}
+            <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+              {leadArticle && (
+                <div className="min-w-0">
+                  <FeaturedArticle article={leadArticle} />
+                </div>
+              )}
 
-            {secondaryArticles.length > 0 && (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                {secondaryArticles.map((a) => (
-                  <ArticleCard key={a.id} article={a} />
-                ))}
-              </div>
-            )}
+              {secondaryArticles.length > 0 && (
+                <div className="flex min-w-0 flex-col divide-y divide-char/8 rounded-wobble-card border border-char/10 bg-surface shadow-shelf dark:divide-white/8 dark:border-white/10 dark:bg-[#262320]">
+                  <p className="px-4 pb-2 pt-3 text-[11px] font-bold uppercase tracking-[0.2em] text-char-soft/70 dark:text-white/35">
+                    سرخط‌ها
+                  </p>
+                  {secondaryArticles.map((a, i) => (
+                    <Link
+                      key={a.id}
+                      href={`/blog/${a.slug}`}
+                      className="group flex flex-1 items-start gap-3 px-4 py-4 transition-colors hover:bg-char/[0.03] dark:hover:bg-white/[0.03]"
+                    >
+                      <span className="mt-0.5 shrink-0 text-lg font-extrabold leading-none text-char/15 transition-colors group-hover:text-lajvard dark:text-white/15 dark:group-hover:text-lajvard-soft">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="line-clamp-2 block text-sm font-bold leading-6 text-char transition-colors group-hover:text-lajvard dark:text-white/90 dark:group-hover:text-lajvard-soft">
+                          {a.title}
+                        </span>
+                        {a.category_name && (
+                          <span className="mt-1 block text-[10px] font-bold text-kiln-clay dark:text-clay-soft">
+                            {a.category_name}
+                          </span>
+                        )}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
         )}
 
@@ -117,7 +152,7 @@ export default async function BlogPage({
           <section className="flex gap-8 py-8 md:py-12">
             {/* Feed */}
             <div className="min-w-0 flex-1">
-            <div className="mb-4 text-xs font-bold uppercase tracking-widest text-char-soft/60 dark:text-white/30">
+              <div className="mb-2 text-xs font-bold uppercase tracking-widest text-char-soft/60 dark:text-white/30">
                 آخرین مقالات
               </div>
               <ArticleFeed articles={paginatedArticles} />
@@ -128,22 +163,19 @@ export default async function BlogPage({
               <div className="sticky top-24 space-y-8">
                 <PopularArticles articles={popular} />
 
-                {/* Newsletter CTA */}
-                <div className="rounded-2xl border border-char/5 bg-char/[0.02] p-5 dark:border-white/5 dark:bg-white/[0.02]">
-                  <h4 className="text-sm font-bold text-char dark:text-white">عضو خبرنامه شوید</h4>
-                  <p className="mt-1.5 text-xs leading-5 text-char-soft dark:text-white/40">
-                    جدیدترین مقالات و اخبار را در ایمیل خود دریافت کنید.
+                {/* Shop CTA */}
+                <div className="rounded-wobble-card bg-gradient-to-br from-lajvard to-lajvard-deep p-6 text-white dark:from-[#1e2a3a] dark:to-[#16202e]">
+                  <p className="text-sm font-extrabold">از قصه تا قطعه</p>
+                  <p className="mt-2 text-xs leading-6 text-white/70">
+                    قطعاتی که توشون می‌خونید رو توی فروشگاه کارگاه ببینید.
                   </p>
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      type="email"
-                      placeholder="ایمیل"
-                      className="min-h-[36px] flex-1 rounded-lg border border-char/10 bg-white px-3 text-xs text-char placeholder:text-char-soft/40 focus:border-lajvard focus:outline-none focus:ring-1 focus:ring-lajvard/25 dark:border-white/10 dark:bg-black/30 dark:text-white dark:placeholder:text-white/30"
-                    />
-                    <button className="shrink-0 rounded-lg bg-lajvard px-3 text-xs font-bold text-white transition-colors hover:bg-lajvard-deep dark:bg-lajvard-soft dark:text-char">
-                      عضویت
-                    </button>
-                  </div>
+                  <Link
+                    href="/shop"
+                    className="group mt-4 inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-lajvard transition-colors hover:bg-kiln-clay hover:text-white"
+                  >
+                    مشاهده فروشگاه
+                    <ChevronLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+                  </Link>
                 </div>
               </div>
             </aside>

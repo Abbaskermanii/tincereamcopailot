@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -79,10 +79,32 @@ export function RichTextEditor({ initialValue, onChange, placeholder = "محتو
     }
   }, [initialValue]);
 
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Replaces the old "paste an image URL" prompt with a real upload flow.
   const addImage = useCallback(() => {
-    const url = window.prompt("آدرس تصویر:");
-    if (url && editor) {
-      editor.chain().focus().setImage({ src: url }).run();
+    imageInputRef.current?.click();
+  }, [editor]);
+
+  const onImagePicked = useCallback(async (file: File) => {
+    if (!editor) return;
+    setUploadingImage(true);
+    try {
+      const { apiFetch } = await import("@/lib/api-client");
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await apiFetch("/admin/media/upload", { method: "POST", body: fd } as RequestInit);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const { mediaUrl } = await import("@/lib/api");
+      editor.chain().focus().setImage({ src: mediaUrl(data.url) }).run();
+    } catch {
+      /* toast is surfaced by the caller's global handler; keep silent here */
+      alert("آپلود تصویر ناموفق بود.");
+    } finally {
+      setUploadingImage(false);
+      if (imageInputRef.current) imageInputRef.current.value = "";
     }
   }, [editor]);
 
@@ -158,9 +180,16 @@ export function RichTextEditor({ initialValue, onChange, placeholder = "محتو
           <AlignRight className="h-4 w-4" />
         </ToolbarButton>
         <div className="mx-1 h-5 w-px bg-char/20 dark:bg-white/20" />
-        <ToolbarButton onClick={addImage}>
-          <ImageIcon className="h-4 w-4" />
+        <ToolbarButton onClick={addImage} disabled={uploadingImage}>
+          {uploadingImage ? "…" : <ImageIcon className="h-4 w-4" />}
         </ToolbarButton>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) void onImagePicked(f); }}
+        />
         <ToolbarButton onClick={() => setShowLinkInput(!showLinkInput)} active={editor.isActive("link")}>
           <LinkIcon className="h-4 w-4" />
         </ToolbarButton>

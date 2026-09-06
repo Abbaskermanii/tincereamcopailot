@@ -69,7 +69,7 @@ export default function AdminQuestionsPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((q) => (
-            <div key={q.id} className="glaze-edge rounded-wobble bg-surface p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted dark:bg-black/25">
+            <div key={q.id} className="glaze-edge rounded-wobble-card bg-surface p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted dark:bg-black/25">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold text-lajvard dark:text-lajvard-soft">{q.product_name}</p>

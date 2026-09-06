@@ -6,44 +6,6 @@ from sqlmodel import Field
 from app.models.base import TimestampMixin, UUIDMixin, utcnow
 from app.models.coupon import DiscountType
 
-
-class Campaign(UUIDMixin, TimestampMixin, table=True):
-    """A sitewide-or-category automatic discount (no coupon code needed)."""
-
-    __tablename__ = "campaigns"
-
-    name: str = Field(max_length=255)
-    slug: str = Field(max_length=255, unique=True, index=True)
-    description: str | None = None
-    banner_url: str | None = Field(default=None, max_length=512)
-    discount_type: DiscountType = Field(sa_column=Column(Enum(DiscountType, name="discounttype")))
-    discount_value: float = Field(sa_column=Column(DECIMAL(14, 0), nullable=False))
-    max_discount_amount: float | None = Field(default=None, sa_column=Column(DECIMAL(14, 0), nullable=True))
-    applies_to_all: bool = Field(default=True)
-    category_ids: str = "[]"  # JSON list of category ids when not applies_to_all
-    starts_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
-    ends_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
-    is_active: bool = Field(default=True, index=True)
-
-    @property
-    def is_running(self) -> bool:
-        if not self.is_active:
-            return False
-        now = utcnow()
-        if self.starts_at and self.starts_at > now:
-            return False
-        if self.ends_at and self.ends_at < now:
-            return False
-        return True
-
-    def compute_discount(self, subtotal: float) -> float:
-        value = float(self.discount_value)
-        amount = subtotal * (value / 100) if self.discount_type == DiscountType.percentage else value
-        if self.max_discount_amount:
-            amount = min(amount, float(self.max_discount_amount))
-        return min(round(amount), round(subtotal))
-
-
 class PaymentTransaction(UUIDMixin, TimestampMixin, table=True):
     """Audit ledger for every gateway interaction (request + verify)."""
 
@@ -59,7 +21,6 @@ class PaymentTransaction(UUIDMixin, TimestampMixin, table=True):
     message: str | None = None
     raw_payload: str | None = None
 
-
 class ShippingMethod(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "shipping_methods"
 
@@ -71,7 +32,6 @@ class ShippingMethod(UUIDMixin, TimestampMixin, table=True):
     estimated_days_max: int = Field(default=5)
     is_active: bool = Field(default=True, index=True)
     sort_order: int = Field(default=0)
-
 
 class ReturnRequest(UUIDMixin, TimestampMixin, table=True):
     """Customer return/refund request (RMA)."""
@@ -87,7 +47,6 @@ class ReturnRequest(UUIDMixin, TimestampMixin, table=True):
     refund_amount: float = Field(default=0, sa_column=Column(DECIMAL(14, 0), nullable=False, default=0))
     resolved_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
 
-
 class OrderStatusHistory(UUIDMixin, table=True):
     __tablename__ = "order_status_history"
     __table_args__ = (Index("ix_osh_order_id", "order_id"),)
@@ -102,7 +61,6 @@ class OrderStatusHistory(UUIDMixin, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False),
     )
 
-
 class CouponRedemption(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "coupon_redemptions"
     __table_args__ = (
@@ -114,7 +72,6 @@ class CouponRedemption(UUIDMixin, TimestampMixin, table=True):
     user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
     order_id: str = Field(foreign_key="orders.id")
     discount_amount: float = Field(default=0, sa_column=Column(DECIMAL(14, 0), nullable=False, default=0))
-
 
 class CartItem(UUIDMixin, TimestampMixin, table=True):
     """Persistent cart for authenticated users (cross-device, server-authoritative)."""

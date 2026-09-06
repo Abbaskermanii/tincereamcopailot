@@ -29,6 +29,19 @@ get_settings.cache_clear()
 @pytest.fixture(scope="session", autouse=True)
 def _create_schema():
     """Fresh schema for the whole test session."""
+    # Drop legacy tables from removed features first — they carry FKs to live
+    # tables that would block drop_all on a pre-cleanup test database.
+    from sqlalchemy import text as _text
+
+    with app_engine.begin() as conn:
+        for table in [
+            "homepage_sections", "navigation_menus", "activity_logs",
+            "newsletter_subscriptions", "static_pages", "campaigns", "brands",
+        ]:
+            conn.execute(_text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
+        conn.execute(_text("ALTER TABLE orders DROP COLUMN IF EXISTS campaign_id"))
+        conn.execute(_text("ALTER TABLE orders DROP COLUMN IF EXISTS campaign_discount_amount"))
+        conn.execute(_text("ALTER TABLE products DROP COLUMN IF EXISTS brand_id"))
     SQLModel.metadata.drop_all(app_engine)
     SQLModel.metadata.create_all(app_engine)
     yield

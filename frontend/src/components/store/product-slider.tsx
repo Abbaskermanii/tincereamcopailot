@@ -13,7 +13,7 @@ export function ProductSlider({ children, className }: ProductSliderProps) {
   if (items.length === 0) return null;
 
   return (
-    <SmartCarousel className={className} minCardWidth={240} gap={12}>
+    <SmartCarousel className={className} minCardWidth={260} maxCardWidth={280} gap={16} minCardHeight={330}>
       {items}
     </SmartCarousel>
   );

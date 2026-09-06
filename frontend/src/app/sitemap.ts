@@ -6,7 +6,7 @@ const SITE = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [cats, articles] = await Promise.all([api.categories(), api.articles()]);
+  const articles = await api.articles();
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE, changeFrequency: "weekly", priority: 1 },
@@ -19,25 +19,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/privacy-policy`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  function flattenCategories(list: typeof cats): typeof cats {
-    if (!list) return [];
-    const out: NonNullable<typeof cats> = [];
-    function walk(nodes: NonNullable<typeof cats>) {
-      for (const n of nodes) {
-        out.push(n);
-        if (n.children && n.children.length > 0) walk(n.children);
-      }
-    }
-    walk(list);
-    return out;
-  }
-
-  const flatCats = flattenCategories(cats);
-  const categoryPages: MetadataRoute.Sitemap = (flatCats ?? []).map((c) => ({
-    url: `${SITE}/category/${c.slug}`,
-    changeFrequency: "daily",
-    priority: 0.8,
-  }));
+  // Category pages redirect permanently to /shop?category=<slug>, so they are
+  // intentionally omitted from the sitemap — the shop URL is canonical.
 
   // Paginate through all products — previous implementation truncated to 48
   const productPages: MetadataRoute.Sitemap = [];
@@ -67,5 +50,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  return [...staticPages, ...categoryPages, ...productPages, ...articlePages];
+  return [...staticPages, ...productPages, ...articlePages];
 }

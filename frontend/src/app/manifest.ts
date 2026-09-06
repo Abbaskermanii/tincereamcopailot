@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "تن‌سِرام — سفال و سرامیک دست‌ساز",
-    short_name: "تن‌سِرام",
+    name: "آنیمور سرام — سفال و سرامیک دست‌ساز",
+    short_name: "آنیمور سرام",
     description: "فروشگاه اینترنتی سفال و سرامیک دست‌ساز ایرانی",
     start_url: "/",
     display: "standalone",

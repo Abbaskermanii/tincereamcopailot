@@ -12,14 +12,14 @@ import { mediaUrl } from "@/lib/api";
 interface Article {
   id: string; title: string; slug: string; excerpt: string | null;
   body: string; published_at: string | null; is_published: boolean;
-  meta_title: string | null; meta_description: string | null;
+  meta_title: string | null; meta_description: string | null; tags?: string[] | null;
   cover_url: string | null; category_id: string | null; category_name?: string | null;
 }
 
 interface ArticleForm {
   title: string; slug: string; excerpt: string; body: string;
   published_at: string; is_published: boolean;
-  meta_title: string; meta_description: string;
+  meta_title: string; meta_description: string; tags: string;
   cover_url: string | null; category_id: string;
 }
 
@@ -29,7 +29,7 @@ export default function AdminArticlesPage() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
   const [deleting, setDeleting] = useState<Article | null>(null);
-  const [form, setForm] = useState<ArticleForm>({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", cover_url: null, category_id: "" });
+  const [form, setForm] = useState<ArticleForm>({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", tags: "", cover_url: null, category_id: "" });
 
   const { data: articles, loading, reload } = useAdminResource<Article[]>("/admin/articles");
   const { data: articleCategories } = useAdminResource<Array<{ id: string; name: string; slug: string }>>("/admin/article-categories");
@@ -42,8 +42,8 @@ export default function AdminArticlesPage() {
     return true;
   });
 
-  const openCreate = () => { setForm({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", cover_url: null, category_id: "" }); setCreating(true); };
-  const openEdit = (a: Article) => { setForm({ title: a.title, slug: a.slug, excerpt: a.excerpt ?? "", body: a.body, published_at: a.published_at ? a.published_at.slice(0, 10) : "", is_published: a.is_published, meta_title: a.meta_title ?? "", meta_description: a.meta_description ?? "", cover_url: a.cover_url ?? null, category_id: a.category_id ?? "" }); setEditing(a); };
+  const openCreate = () => { setForm({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", tags: "", cover_url: null, category_id: "" }); setCreating(true); };
+  const openEdit = (a: Article) => { setForm({ title: a.title, slug: a.slug, excerpt: a.excerpt ?? "", body: a.body, published_at: a.published_at ? a.published_at.slice(0, 10) : "", is_published: a.is_published, meta_title: a.meta_title ?? "", meta_description: a.meta_description ?? "", tags: (a.tags ?? []).join("، "), cover_url: a.cover_url ?? null, category_id: a.category_id ?? "" }); setEditing(a); };
 
   const submit = async () => {
     const body = { ...form, published_at: form.published_at || null, cover_url: form.cover_url || null, category_id: form.category_id || null };
@@ -154,6 +154,9 @@ export default function AdminArticlesPage() {
               <TextInput value={form.meta_description} onChange={(e) => setForm({ ...form, meta_description: e.target.value })} placeholder="خالی = خلاصه مقاله" />
             </Field>
           </div>
+          <Field label="برچسب‌ها" hint="با ویرگول جدا کنید — برای سئو و صفحهٔ مقاله">
+            <TextInput value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="لقاب دست‌ساز، ماگ، کرج" />
+          </Field>
           <FormActions onCancel={() => { setCreating(false); setEditing(null); }} busy={busy} />
         </form>
       </Modal>

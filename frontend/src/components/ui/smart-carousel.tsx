@@ -9,25 +9,73 @@ interface SmartCarouselProps {
   minCardWidth?: number;
   maxCardWidth?: number;
   gap?: number;
+  /** Shared minimum card height — keeps product/article cards the same size across sections */
+  minCardHeight?: number;
+  /** Slow automatic glide (ms between steps). Pauses on hover and hidden tabs. */
+  autoPlayMs?: number;
 }
 
+/**
+ * Horizontal snap carousel that sizes its cards from the *measured container
+ * width* (not 100vw), so cards always align flush with the section heading
+ * and page padding — no half-visible cards, no uneven gutters.
+ */
 export function SmartCarousel({
   children,
   className,
-  minCardWidth = 260,
-  maxCardWidth = 360,
-  gap = 12,
+  minCardWidth = 240,
+  maxCardWidth = 320,
+  gap = 16,
+  minCardHeight,
+  autoPlayMs,
 }: SmartCarouselProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const [cardWidth, setCardWidth] = useState(minCardWidth);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(true);
+  const [paused, setPaused] = useState(false);
+
+  /* Measure the container and derive a uniform card width */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const width = el.clientWidth;
+      if (width <= 0) return;
+      // Max cards that fit while keeping at least minCardWidth…
+      let n = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
+      let w = (width - gap * (n - 1)) / n;
+      // …but if cards overshoot maxCardWidth, squeeze more in when reasonable.
+      if (w > maxCardWidth) {
+        const nByMax = Math.ceil((width + gap) / (maxCardWidth + gap));
+        const wByMax = (width - gap * (nByMax - 1)) / nByMax;
+        if (wByMax >= minCardWidth * 0.8) {
+          n = nByMax;
+          w = wByMax;
+        } else if (width > 340) {
+          // Small screens: one card + a peek of the next, instead of a huge full-width card.
+          w = width * 0.75;
+        }
+      }
+      setCardWidth(Math.floor(w));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [minCardWidth, maxCardWidth, gap]);
 
   const updateScrollState = useCallback(() => {
     const el = trackRef.current;
     if (!el) return;
     const maxScroll = el.scrollWidth - el.clientWidth;
-    setCanPrev(el.scrollLeft > 2);
-    setCanNext(el.scrollLeft < maxScroll - 2);
+    // RTL carousels scroll into negative values; normalise with abs.
+    const pos = Math.abs(el.scrollLeft);
+    setCanPrev(pos > 2);
+    setCanNext(pos < maxScroll - 2);
   }, []);
 
   useEffect(() => {
@@ -43,21 +91,64 @@ export function SmartCarousel({
     };
   }, [updateScrollState]);
 
-  const scrollBy = useCallback((direction: -1 | 1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const cardWidth = el.querySelector<HTMLElement>(":scope > *")?.offsetWidth ?? minCardWidth;
-    el.scrollBy({ left: direction * (cardWidth + gap) * 2, behavior: "smooth" });
-  }, [minCardWidth, gap]);
+  const scrollByCards = useCallback(
+    (direction: -1 | 1) => {
+      const el = trackRef.current;
+      if (!el) return;
+      const step = (cardWidth + gap) * 2;
+      // In RTL, "next" moves further negative — flip the sign for the visual direction.
+      const rtl = getComputedStyle(el).direction === "rtl";
+      const delta = rtl ? -direction : direction;
+      el.scrollBy({ left: delta * step, behavior: "smooth" });
+    },
+    [cardWidth, gap],
+  );
+
+  // Slow glide with easing (native scrollBy is too snappy for ambient motion)
+  const glideByCards = useCallback(
+    (direction: -1 | 1) => {
+      const el = trackRef.current;
+      if (!el) return;
+      const rtl = getComputedStyle(el).direction === "rtl";
+      const delta = (rtl ? -1 : 1) * direction * (cardWidth + gap);
+      const from = el.scrollLeft;
+      const to = from + delta;
+      const duration = 1300;
+      const t0 = performance.now();
+      const maxScroll = el.scrollWidth - el.clientWidth;
+      // Loop back to the start when the end is reached
+      const target = Math.abs(to) > maxScroll + 4 ? 0 : to;
+      const step = (t: number) => {
+        const p = Math.min(1, (t - t0) / duration);
+        const eased = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        el.scrollLeft = from + (target - from) * eased;
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    },
+    [cardWidth, gap],
+  );
+
+  useEffect(() => {
+    if (!autoPlayMs || paused) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    const id = setInterval(() => glideByCards(1), autoPlayMs);
+    return () => clearInterval(id);
+  }, [autoPlayMs, paused, glideByCards]);
 
   const items = React.Children.toArray(children);
   if (items.length === 0) return null;
 
   return (
-    <div className={cn("group/carousel relative -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8", className)}>
+    <div
+      className={cn("group/carousel relative", className)}
+      ref={containerRef}
+      onMouseEnter={() => autoPlayMs && setPaused(true)}
+      onMouseLeave={() => autoPlayMs && setPaused(false)}
+    >
       <div
         ref={trackRef}
-        className="no-scrollbar flex items-stretch snap-x snap-mandatory overflow-x-auto scroll-smooth"
+        className="no-scrollbar flex items-stretch snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1"
         style={{ gap: `${gap}px`, scrollPaddingInline: `${gap}px` }}
       >
         {items.map((child, i) => (
@@ -65,7 +156,9 @@ export function SmartCarousel({
             key={i}
             className="snap-start flex shrink-0"
             style={{
-              flex: `0 0 clamp(${minCardWidth}px, calc((100vw - ${gap * 2}px - 32px) / ${Math.max(2, Math.floor((1000) / (minCardWidth + gap)))}), ${maxCardWidth}px)`,
+              flex: `0 0 ${cardWidth}px`,
+              width: `${cardWidth}px`,
+              ...(minCardHeight ? { height: `${minCardHeight}px` } : {}),
             }}
           >
             {child}
@@ -73,23 +166,23 @@ export function SmartCarousel({
         ))}
       </div>
 
-      {/* Navigation arrows */}
+      {/* Navigation arrows — desktop hover */}
       {items.length > 2 && (
         <>
           <button
             type="button"
             aria-label="قبلی"
-            onClick={() => scrollBy(-1)}
+            onClick={() => scrollByCards(-1)}
             className={cn(
-              "absolute -left-1 top-1/2 z-10 -translate-y-1/2",
+              "absolute -right-3 top-1/2 z-10 -translate-y-1/2",
               "flex h-9 w-9 items-center justify-center rounded-full",
-              "border border-char/10 bg-surface/90 text-char-soft shadow-md backdrop-blur-sm",
+              "border border-char/10 bg-surface/95 text-char-soft shadow-md backdrop-blur-sm",
               "transition-all duration-200",
               "hover:bg-lajvard hover:text-white hover:border-lajvard",
-              "dark:border-white/10 dark:bg-[#262320]/90 dark:text-white/60",
+              "dark:border-white/10 dark:bg-[#262320]/95 dark:text-white/60",
               "dark:hover:bg-lajvard-soft dark:hover:text-char",
-              "opacity-0 group-hover/carousel:opacity-100",
-              canPrev ? "cursor-pointer" : "pointer-events-none opacity-0"
+              "opacity-0 group-hover/carousel:opacity-100 max-lg:hidden",
+              canPrev ? "cursor-pointer" : "pointer-events-none opacity-0",
             )}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -99,17 +192,17 @@ export function SmartCarousel({
           <button
             type="button"
             aria-label="بعدی"
-            onClick={() => scrollBy(1)}
+            onClick={() => scrollByCards(1)}
             className={cn(
-              "absolute -right-1 top-1/2 z-10 -translate-y-1/2",
+              "absolute -left-3 top-1/2 z-10 -translate-y-1/2",
               "flex h-9 w-9 items-center justify-center rounded-full",
-              "border border-char/10 bg-surface/90 text-char-soft shadow-md backdrop-blur-sm",
+              "border border-char/10 bg-surface/95 text-char-soft shadow-md backdrop-blur-sm",
               "transition-all duration-200",
               "hover:bg-lajvard hover:text-white hover:border-lajvard",
-              "dark:border-white/10 dark:bg-[#262320]/90 dark:text-white/60",
+              "dark:border-white/10 dark:bg-[#262320]/95 dark:text-white/60",
               "dark:hover:bg-lajvard-soft dark:hover:text-char",
-              "opacity-0 group-hover/carousel:opacity-100",
-              canNext ? "cursor-pointer" : "pointer-events-none opacity-0"
+              "opacity-0 group-hover/carousel:opacity-100 max-lg:hidden",
+              canNext ? "cursor-pointer" : "pointer-events-none opacity-0",
             )}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

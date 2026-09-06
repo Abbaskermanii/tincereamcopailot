@@ -107,6 +107,20 @@ export const api = {
   categories: () => get<Category[]>("/categories"),
   category: (slug: string) =>
     get<Category & { product_count: number }>(`/categories/${slug}`),
+  latestReviews: (limit = 6) =>
+    get<
+      Array<{
+        id: string;
+        author_name: string;
+        rating: number;
+        title: string;
+        body: string;
+        is_buyer: boolean;
+        created_at: string;
+        product_name?: string | null;
+        product_slug?: string | null;
+      }>
+    >("/reviews/latest", 300).then((r) => r ?? []),
   products: (
     params: Record<string, string | number | boolean | undefined>,
     revalidate = 90,
@@ -135,7 +149,7 @@ export const api = {
       }
     >(`/products/${slug}`),
   articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>>("/articles", 180),
-  article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>(`/articles/${slug}`, 300),
+  article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number; tags?: string[] }>(`/articles/${slug}`, 300),
   articleCategories: () => get<Array<{ id: string; name: string; slug: string }>>("/article-categories", 300),
   carousels: () =>
     get<Array<{ id: string; title?: string; subtitle?: string | null; image_url: string; link_url?: string | null; sort_order: number; is_active?: boolean }>>(
@@ -148,22 +162,4 @@ export const api = {
       "/faq",
       120
     ),
-  homepage: () =>
-    get<{
-      sections: Array<{
-        id: string;
-        kind: string;
-        title: string;
-        subtitle: string | null;
-        sort_order: number;
-        source?: string | null;
-        products?: ProductListItem[];
-        slides?: Array<{ id: string; title: string; subtitle: string | null; image_url: string; link_url: string | null }>;
-        categories?: Array<{ id: string; name: string; slug: string; image_url: string | null; product_count: number }>;
-        articles?: Array<{ id: string; title: string; slug: string; excerpt: string; published_at: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>;
-        faq?: Array<{ id: string; question: string; answer: string; category?: string; sort_order?: number; is_active?: boolean }>;
-      }>;
-      generated_at: string;
-    }>("/homepage", 60),
-  brands: () => get<Array<{ id: string; name: string; slug: string; logo_url: string | null; is_active: boolean }>>("/brands", 120),
 };

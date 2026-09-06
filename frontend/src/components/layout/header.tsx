@@ -12,6 +12,7 @@ import {
   Package,
   Search,
   ShoppingBag,
+  Truck,
   UserRound,
   X,
 } from "lucide-react";
@@ -343,6 +344,43 @@ function AccountMenu({ user, isAdmin, loading, onLogout }: AccountMenuProps) {
                 </button>
               );
             })}
+
+            {/* Order tracking */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => handleNavigate("/track")}
+              className="
+                flex
+                h-9
+                w-full
+                items-center
+                gap-2.5
+                rounded-lg
+                px-2.5
+                text-right
+                text-[13px]
+                text-char
+                transition-colors
+                hover:bg-char/5
+                hover:text-lajvard
+                dark:text-white/85
+                dark:hover:bg-white/5
+                dark:hover:text-lajvard
+              "
+            >
+              <Truck
+                className="
+                  h-[17px]
+                  w-[17px]
+                  shrink-0
+                  text-char-soft
+                  transition-colors
+                "
+                strokeWidth={1.8}
+              />
+              <span>پیگیری سفارش</span>
+            </button>
           </nav>
 
           {/* Admin */}
@@ -485,7 +523,7 @@ export function Header() {
 
     if (!q.trim()) return;
 
-    router.push(`/search?q=${encodeURIComponent(q)}`);
+    router.push(`/shop?q=${encodeURIComponent(q)}`);
 
     setSearchOpen(false);
     setQ("");
@@ -579,7 +617,7 @@ export function Header() {
             "
             onClick={closeAllMenus}
           >
-            تن‌سِرام
+            آنیمور سرام
           </Link>
 
           {/* Desktop navigation */}
@@ -762,7 +800,7 @@ export function Header() {
                         {hits.categories.map((category) => (
                           <Link
                             key={category.slug}
-                            href={`/category/${category.slug}`}
+                            href={`/shop?category=${category.slug}`}
                             className="
                               block
                               rounded-lg
@@ -811,7 +849,7 @@ export function Header() {
               <AccountMenu user={user} isAdmin={isAdmin} loading={loading} onLogout={logout} />
             ) : (
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => router.push("/auth")}
                 className="
                   h-9
@@ -1004,6 +1042,33 @@ export function Header() {
                   </button>
                 ))}
               </div>
+
+              <div className="my-4 h-px bg-char/10 dark:bg-white/10" />
+
+              {/* Order tracking — available to everyone */}
+              <button
+                type="button"
+                onClick={() => handleMobileNavigation("/track")}
+                className="
+                  flex
+                  h-10
+                  w-full
+                  items-center
+                  gap-2.5
+                  rounded-lg
+                  px-3
+                  text-right
+                  text-sm
+                  font-medium
+                  transition-colors
+                  hover:bg-char/5
+                  hover:text-lajvard
+                  dark:hover:bg-white/5
+                "
+              >
+                <Truck className="h-[17px] w-[17px] text-char-soft" strokeWidth={1.8} />
+                پیگیری سفارش
+              </button>
 
               <div className="my-4 h-px bg-char/10 dark:bg-white/10" />
 

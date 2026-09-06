@@ -44,10 +44,10 @@ export function ProductCard({
   return (
     <Link
       href={`/product/${slug}`}
-      className="group glaze-edge flex h-full flex-col overflow-hidden rounded-wobble bg-surface transition-all duration-300 hover:shadow-lifted dark:bg-[#262320]"
+      className="group glaze-edge flex h-full w-full flex-col overflow-hidden rounded-wobble-card hover:-translate-y-0.5 bg-surface shadow-shelf transition-all duration-300 hover:border-lajvard/40 hover:shadow-lifted dark:bg-[#262320] dark:hover:border-lajvard-soft/40 border border-transparent"
     >
       {/* Image Container — fixed aspect ratio */}
-      <div className="relative aspect-[4/3] shrink-0 overflow-hidden bg-slip dark:bg-char">
+      <div className="relative aspect-square shrink-0 overflow-hidden bg-surface dark:bg-[#1c1a18]">
         {productImage ? (
           <Image
             src={productImage}
@@ -102,7 +102,7 @@ export function ProductCard({
       </div>
 
       {/* Content — flex-col with fixed structure */}
-      <div className="flex min-h-0 flex-1 flex-col p-2.5">
+      <div className="flex min-h-0 flex-1 flex-col p-2">
         {/* Category — fixed height row, hidden when empty to avoid shifting */}
         <div className="mb-1 h-4">
           {category && (
@@ -113,7 +113,7 @@ export function ProductCard({
         </div>
 
         {/* Title — exactly 2 lines, no more */}
-        <h3 className="mb-1.5 line-clamp-2 min-h-[2.5rem] text-sm font-bold leading-[1.25] text-char-800 dark:text-white/90">
+        <h3 className="mb-1 line-clamp-2 min-h-[2.5rem] text-[13px] font-bold leading-[1.3] text-char-800 transition-colors group-hover:text-lajvard dark:text-white/90 dark:group-hover:text-lajvard-soft">
           {name}
         </h3>
 

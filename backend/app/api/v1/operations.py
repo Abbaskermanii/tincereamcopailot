@@ -8,7 +8,6 @@ from sqlmodel import Session, select
 from app.db.session import get_session
 from app.models import *
 from app.api.v1.auth import admin_user, current_user
-from app.services.homepage import invalidate_home
 from app.services.storage import put_image
 
 admin = APIRouter(prefix="/admin")
@@ -80,7 +79,7 @@ def delete_coupon(coupon_id: str, _: User = Depends(admin_user), s: Session = De
 
 @admin.post("/carousels", status_code=201)
 def create_carousel(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
-    row = Carousel(**data); s.add(row); s.commit(); invalidate_home(); s.refresh(row); return row
+    row = Carousel(**data); s.add(row); s.commit(); s.refresh(row); return row
 
 
 @admin.get("/carousels")
@@ -94,14 +93,14 @@ def update_carousel(carousel_id: str, data: dict, _: User = Depends(admin_user),
     if not row: raise HTTPException(404, "بنر یافت نشد")
     for key, value in data.items():
         if hasattr(row, key): setattr(row, key, value)
-    s.add(row); s.commit(); invalidate_home(); return row
+    s.add(row); s.commit(); return row
 
 
 @admin.delete("/carousels/{carousel_id}")
 def delete_carousel(carousel_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     row = s.get(Carousel, carousel_id)
     if not row: raise HTTPException(404, "بنر یافت نشد")
-    s.delete(row); s.commit(); invalidate_home(); return {"ok": True}
+    s.delete(row); s.commit(); return {"ok": True}
 
 
 @public.get("/carousels")
@@ -150,7 +149,6 @@ class ProductIn(BaseModel):
     name: str; slug: str; category_id: str; price: float; sku: str
     description: str = ""; short_description: str | None = None
     stock_qty: int = 0; is_active: bool = True
-    brand_id: str | None = None
     compare_at_price: float | None = None
 
 @admin.post("/products", status_code=201)
@@ -162,6 +160,26 @@ def create_product(p: ProductIn, _: User = Depends(admin_user), s: Session = Dep
 @admin.get("/products")
 def products(_: User = Depends(admin_user), s: Session = Depends(get_session), offset: int = 0, limit: int = Query(50, le=100)):
     return s.exec(select(Product).offset(offset).limit(limit)).all()
+
+@admin.get("/products/{product_id}")
+def get_product_admin(product_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+    """Full product detail for the admin editor."""
+    row = s.get(Product, product_id)
+    if not row:
+        raise HTTPException(404, "محصول یافت نشد")
+    return {
+        "id": row.id, "name": row.name, "slug": row.slug, "sku": row.sku,
+        "category_id": row.category_id,
+        "price": float(row.price),
+        "compare_at_price": float(row.compare_at_price) if row.compare_at_price else None,
+        "stock_qty": row.stock_qty, "is_active": row.is_active,
+        "description": row.description, "short_description": row.short_description,
+        "material": row.material, "dimensions": row.dimensions,
+        "weight_grams": row.weight_grams,
+        "meta_title": row.meta_title, "meta_description": row.meta_description,
+        "created_at": row.created_at,
+    }
+
 
 @admin.patch("/products/{product_id}")
 def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
@@ -180,14 +198,13 @@ def update_product(product_id: str, p: dict, _: User = Depends(admin_user), s: S
         if duplicate:
             raise HTTPException(409, "slug یا SKU تکراری است")
     # M4 fix: allowlist to prevent mass assignment of id/created_at etc.
-    allowed = {"name", "slug", "category_id", "description", "short_description", "price", "compare_at_price", "stock_qty", "sku", "weight_grams", "material", "dimensions", "is_active", "brand_id", "meta_title", "meta_description"}
+    allowed = {"name", "slug", "category_id", "description", "short_description", "price", "compare_at_price", "stock_qty", "sku", "weight_grams", "material", "dimensions", "is_active", "meta_title", "meta_description"}
     for k, v in p.items():
         if k in allowed:
             setattr(row, k, v)
     s.add(row)
     s.commit()
     s.refresh(row)
-    invalidate_home()
     return row
 
 @admin.delete("/products/{product_id}")
@@ -200,8 +217,6 @@ def delete_product(product_id: str, _: User = Depends(admin_user), s: Session = 
 def related(product_id: str, related_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     if not s.get(Product, product_id) or not s.get(Product, related_id): raise HTTPException(404,"محصول یافت نشد")
     row=RelatedProduct(product_id=product_id, related_product_id=related_id); s.add(row); s.commit(); return row
-
-@admin.get("/stock-alerts")
 def stock_alerts(threshold: int = 5, _: User = Depends(admin_user), s: Session = Depends(get_session)):
     return s.exec(select(Product).where(Product.stock_qty <= threshold, Product.is_active == True)).all()  # noqa
 
@@ -212,6 +227,8 @@ def public_related(product_id: str, s: Session = Depends(get_session)):
 
 class ArticleIn(BaseModel):
     title: str; slug: str; body: str; excerpt: str = ""; cover_url: str | None = None; category_id: str | None = None; is_published: bool = False
+    tags: str = ""
+    tags: str = ""
 
 
 @admin.post("/article-categories", status_code=201)
@@ -307,7 +324,7 @@ def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s
         raise HTTPException(404, "مقاله یافت نشد")
     if "slug" in data and s.exec(select(Article).where(Article.slug == data["slug"], Article.id != article_id)).first():
         raise HTTPException(409, "slug تکراری است")
-    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "published_at"}
+    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "published_at", "tags"}
     for key, value in data.items():
         if key in allowed:
             if key in ("body", "excerpt") and isinstance(value, str):
@@ -317,7 +334,6 @@ def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s
         row.published_at = datetime.now(UTC)
     s.add(row)
     s.commit()
-    invalidate_home()
     return row
 
 
@@ -374,6 +390,14 @@ def update_order_status(order_id: str, data: dict, _: User = Depends(admin_user)
     s.commit()
     return row
 
+def _split_tags(raw: str | None) -> list[str]:
+    """'لقاب، دست‌ساز، کرج' -> ['لقاب', 'دست‌ساز', 'کرج'] (commas + arabic comma)."""
+    import re as _re
+    if not raw:
+        return []
+    return [t.strip() for t in _re.split(r"[,،]", raw) if t.strip()]
+
+
 @public.get("/articles")
 def articles(s: Session = Depends(get_session), offset: int=0, limit: int=Query(20,le=100)):
     rows = s.exec(select(Article).where(Article.is_published==True).order_by(Article.published_at.desc()).offset(offset).limit(limit)).all() # noqa
@@ -395,6 +419,7 @@ def articles(s: Session = Depends(get_session), offset: int=0, limit: int=Query(
             "author_name": (authors[a.author_id].full_name or authors[a.author_id].email) if a.author_id and a.author_id in authors else None,
             "author_avatar_url": authors[a.author_id].avatar_url if a.author_id and a.author_id in authors else None,
             "reading_time_minutes": max(1, len(a.body) // 800) if a.body else 1,
+            "tags": _split_tags(getattr(a, "tags", "")),
         }
         for a in rows
     ]
@@ -409,7 +434,25 @@ def public_article_categories(s: Session = Depends(get_session)):
 def article(slug: str, s: Session = Depends(get_session)):
     row=s.exec(select(Article).where(Article.slug==slug, Article.is_published==True)).first() # noqa
     if not row: raise HTTPException(404,"مقاله یافت نشد")
-    return row
+    author = s.get(User, row.author_id) if row.author_id else None
+    cat = s.get(ArticleCategory, row.category_id) if row.category_id else None
+    return {
+        "id": row.id,
+        "title": row.title,
+        "slug": row.slug,
+        "excerpt": row.excerpt,
+        "body": row.body,
+        "cover_url": row.cover_url,
+        "published_at": row.published_at,
+        "updated_at": row.updated_at,
+        "meta_title": row.meta_title,
+        "meta_description": row.meta_description,
+        "category_name": cat.name if cat else None,
+        "author_name": (author.full_name or author.email) if author else None,
+        "author_avatar_url": author.avatar_url if author else None,
+        "reading_time_minutes": max(1, len(row.body) // 800) if row.body else 1,
+        "tags": _split_tags(getattr(row, "tags", "")),
+    }
 
 @admin.post("/settings")
 def set_setting(data: dict, _: User = Depends(admin_user), s: Session = Depends(get_session)):
@@ -443,11 +486,3 @@ def mark_read(notification_id: str, u: User=Depends(current_user), s: Session=De
     if not row or row.user_id!=u.id: raise HTTPException(404,"اعلان یافت نشد")
     row.is_read=True; s.add(row); s.commit(); return {"ok":True}
 
-@admin.get("/activity")
-def activity(_: User=Depends(admin_user), s: Session=Depends(get_session), limit:int=Query(100,le=500)):
-    return s.exec(select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit)).all()
-
-@admin.get("/analytics")
-def analytics(_: User=Depends(admin_user), s: Session=Depends(get_session)):
-    from sqlalchemy import func
-    return {"orders": s.exec(select(func.count(Order.id))).one(), "revenue": s.exec(select(func.coalesce(func.sum(Order.total_amount),0)).where(Order.status!="cancelled")).one()}

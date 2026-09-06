@@ -33,7 +33,7 @@ export function ArticlesSection({ title, subtitle, eyebrow, articles }: Articles
           </Link>
         }
       />
-      <SmartCarousel minCardWidth={280} gap={14}>
+      <SmartCarousel minCardWidth={260} maxCardWidth={280} gap={16} minCardHeight={330}>
         {display.map((a) => (
           <ArticleCard key={a.id} article={a} />
         ))}

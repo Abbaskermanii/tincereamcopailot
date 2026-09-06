@@ -91,7 +91,6 @@ async def create_order_endpoint(
         discount_amount=order.discount_amount,
         tax_rate=order.tax_rate,
         tax_amount=order.tax_amount,
-        campaign_discount_amount=order.campaign_discount_amount,
         payment_url=paypage_url,
         items=[
             {
@@ -128,7 +127,6 @@ async def order_status(
         discount_amount=float(order.discount_amount),
         tax_rate=float(order.tax_rate),
         tax_amount=float(order.tax_amount),
-        campaign_discount_amount=float(order.campaign_discount_amount),
         tracking_code=order.tracking_code,
         carrier=order.carrier,
         shipping_method_name=order.shipping_method_name,

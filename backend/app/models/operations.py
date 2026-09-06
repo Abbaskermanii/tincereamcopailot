@@ -25,6 +25,7 @@ class Article(UUIDMixin, TimestampMixin, table=True):
     published_at: datetime | None = None
     meta_title: str | None = None
     meta_description: str | None = None
+    tags: str = Field(default="", max_length=500)  # comma-separated labels
 
 class Carousel(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "carousels"
@@ -50,16 +51,3 @@ class Notification(UUIDMixin, TimestampMixin, table=True):
     body: str = ""
     is_read: bool = Field(default=False, index=True)
 
-class ActivityLog(UUIDMixin, TimestampMixin, table=True):
-    __tablename__ = "activity_logs"
-    actor_id: str | None = Field(default=None, index=True)
-    action: str = Field(max_length=128, index=True)
-    entity_type: str = Field(max_length=64)
-    entity_id: str | None = None
-    metadata_json: str = "{}"
-
-class NewsletterSubscription(UUIDMixin, TimestampMixin, table=True):
-    __tablename__ = "newsletter_subscriptions"
-    email: str = Field(max_length=255, unique=True, index=True)
-    consent: bool = True
-    unsubscribed_at: datetime | None = None

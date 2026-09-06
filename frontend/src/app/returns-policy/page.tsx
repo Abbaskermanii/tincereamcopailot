@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CmsPage } from "@/components/cms/cms-page";
 
-export const metadata: Metadata = { title: "شرایط مرجوعی", description: "شرایط بازگشت کالای شکسته یا ناراضی از خرید در فروشگاه تن‌سِرام." };
+export const metadata: Metadata = { title: "شرایط مرجوعی", description: "شرایط بازگشت کالای شکسته یا ناراضی از خرید در فروشگاه آنیمور سرام." };
 
 const RULES: [string, string][] = [
   ["۷ روز مهلت", "از لحظهٔ تحویل، ۷ روز فرصت دارید مرجوعی را اعلام کنید."],

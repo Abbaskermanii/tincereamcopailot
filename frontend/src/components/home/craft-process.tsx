@@ -28,7 +28,7 @@ const steps = [
 
 export function CraftProcess() {
   return (
-    <section className="py-12 md:py-16 lg:py-20" aria-labelledby="craft-process">
+    <section className="hidden py-12 md:block md:py-16 lg:py-20" aria-labelledby="craft-process">
       <div className="mb-10 text-center md:mb-12">
         <span className="mb-2 inline-block text-[10px] font-bold uppercase tracking-[0.25em] text-kiln-clay dark:text-clay-soft md:text-xs">
           فرایند ساخت

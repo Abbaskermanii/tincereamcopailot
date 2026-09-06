@@ -5,19 +5,6 @@ from sqlmodel import Field
 
 from app.models.base import TimestampMixin, UUIDMixin, utcnow
 
-
-class StaticPage(UUIDMixin, TimestampMixin, table=True):
-    __tablename__ = "static_pages"
-
-    title: str = Field(max_length=255)
-    slug: str = Field(max_length=255, unique=True, index=True)
-    content: str = ""
-    meta_title: str | None = Field(default=None, max_length=255)
-    meta_description: str | None = Field(default=None, max_length=512)
-    is_published: bool = Field(default=False, index=True)
-    sort_order: int = Field(default=0)
-
-
 class FAQItem(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "faq_items"
     __table_args__ = (Index("ix_faq_sort", "sort_order"),)
@@ -27,7 +14,6 @@ class FAQItem(UUIDMixin, TimestampMixin, table=True):
     category: str = Field(default="عمومی", max_length=64, index=True)
     sort_order: int = Field(default=0)
     is_active: bool = Field(default=True, index=True)
-
 
 class ContactMessage(UUIDMixin, TimestampMixin, table=True):
     __tablename__ = "contact_messages"

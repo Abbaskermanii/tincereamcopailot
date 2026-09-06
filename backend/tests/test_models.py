@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 from app.models import Coupon, DiscountType, Product
-from app.services.orders import GIFT_WRAP_FEE, compute_totals, generate_order_number
+from app.services.orders import DEFAULT_GIFT_WRAP_FEE, compute_totals, generate_order_number
 from scripts.seed_data import build_rows
 
 
@@ -86,8 +86,8 @@ class TestTotals:
     def test_totals_with_coupon_and_gift(self):
         t = compute_totals(1000000, _coupon(discount_value=20), True)
         assert t["discount_amount"] == 200000
-        assert t["gift_wrap_fee"] == GIFT_WRAP_FEE
-        assert t["total_amount"] == 1000000 - 200000 + GIFT_WRAP_FEE
+        assert t["gift_wrap_fee"] == DEFAULT_GIFT_WRAP_FEE
+        assert t["total_amount"] == 1000000 - 200000 + DEFAULT_GIFT_WRAP_FEE
 
     def test_generate_order_number_shape(self):
         n1, n2 = generate_order_number(), generate_order_number()

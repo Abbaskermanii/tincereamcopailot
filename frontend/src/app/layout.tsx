@@ -8,6 +8,7 @@ import { ToastProvider } from "@/components/ui/toast-provider";
 import { SettingsProvider } from "@/lib/settings-context";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { StoreChrome } from "@/components/layout/store-chrome";
 import { ServiceWorkerRegistrar } from "@/components/layout/service-worker-registrar";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -20,15 +21,15 @@ const vazir = Vazirmatn({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: {
-    default: "تن‌سِرام | سفال و سرامیک دست‌ساز ایرانی",
-    template: "%s | تن‌سِرام",
+    default: "آنیمور سرام | سفال و سرامیک دست‌ساز ایرانی",
+    template: "%s | آنیمور سرام",
   },
   description:
-    "فروشگاه اینترنتی سفال و سرامیک دست‌ساز؛ ماگ، زیرسیگاری، ادویه‌دان و کوزه‌های لعاب‌دست‌شده، ساخته‌شده در کارگاه تن‌سِرام.",
+    "آنیمور سرام؛ تولیدکنندهٔ سفال و سرامیک دست‌ساز در کرج. ماگ، ادویه‌دان، شیرینی‌دان و کوزه‌های لعاب‌دست‌شده، مستقیم از کارگاه ما تا خانهٔ شما.",
   openGraph: {
     type: "website",
     locale: "fa_IR",
-    siteName: "تن‌سِرام",
+    siteName: "آنیمور سرام",
   },
 };
 
@@ -48,9 +49,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     >
                       پرش به محتوای اصلی
                     </a>
-                    <Header />
-                    <main id="main">{children}</main>
-                    <Footer />
+                    <StoreChrome header={<Header />} footer={<Footer />}>
+                    {children}
+                  </StoreChrome>
                     <ServiceWorkerRegistrar />
                   </ToastProvider>
                 </ErrorBoundary>

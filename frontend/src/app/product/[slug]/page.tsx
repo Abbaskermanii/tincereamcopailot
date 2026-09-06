@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { api, SITE_URL } from "@/lib/api";
+import { api, mediaUrl, SITE_URL } from "@/lib/api";
 import { ProductView } from "@/components/store/product-view";
 import { RelatedProducts } from "@/components/store/related-products";
 import { ProductReviews } from "@/components/store/product-reviews";
@@ -26,6 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!product) return { title: "محصول یافت نشد" };
   const title = product.name;
   const description = product.short_description || product.description?.slice(0, 160) || `${product.name} - دست‌ساز تن‌سرام`;
+  const ogImage = product.primary_image_url ?? product.images?.[0]?.url ?? null;
   return {
     title: `${title} | تن‌سرام`,
     description,
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${title} | تن‌سرام`,
       description,
-      images: product.images?.[0]?.url ? [{ url: product.images[0].url }] : undefined,
+      images: ogImage ? [{ url: mediaUrl(ogImage) }] : undefined,
       type: "website",
     },
   };
@@ -62,6 +63,7 @@ export default async function ProductPage({ params }: Props) {
     sku: product.sku ?? "",
     primary_image_url: product.primary_image_url ?? product.images?.[0]?.url ?? "",
     category_slug: product.category_slug,
+    category_name: product.category_name,
   };
 
   // JSON-LD for SEO - server rendered (no useEffect)
@@ -70,9 +72,14 @@ export default async function ProductPage({ params }: Props) {
     "@type": "Product",
     name: product.name,
     description: product.short_description ?? product.description?.slice(0, 300) ?? "",
-    image: product.images?.[0]?.url ? [product.images[0].url] : [],
+    image: product.images?.length
+      ? product.images.map((i) => mediaUrl(i.url)).filter(Boolean)
+      : product.primary_image_url
+        ? [mediaUrl(product.primary_image_url)]
+        : [],
     sku: product.sku ?? "",
-    brand: { "@type": "Brand", name: "TinCeram" },
+    category: product.category_name ?? undefined,
+    brand: { "@type": "Brand", name: "Animour Ceram" },
     offers: {
       "@type": "Offer",
       url: `${SITE_URL}/product/${product.slug}`,
@@ -88,7 +95,13 @@ export default async function ProductPage({ params }: Props) {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "خانه", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: product.name, item: `${SITE_URL}/product/${product.slug}` },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: product.category_name ?? "فروشگاه",
+        item: product.category_slug ? `${SITE_URL}/shop?category=${product.category_slug}` : `${SITE_URL}/shop`,
+      },
+      { "@type": "ListItem", position: 3, name: product.name, item: `${SITE_URL}/product/${product.slug}` },
     ],
   };
 

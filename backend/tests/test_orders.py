@@ -101,7 +101,7 @@ class TestCreateOrder:
         payload = _payload(sample_product, quantity=sample_product["stock_qty"] + 5)
         resp = await client.post("/api/v1/orders", json=payload)
         assert resp.status_code == 409
-        assert "کافی نیست" in resp.json()["detail"]
+        assert "کافی نیست" in str(resp.json())
 
     async def test_unknown_product_404(self, client, sample_product):
         payload = _payload(sample_product)

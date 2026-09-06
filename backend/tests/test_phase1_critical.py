@@ -180,7 +180,7 @@ async def test_coupon_per_user_limit_at_checkout(seeded_session, sample_product)
         # Second checkout with same coupon + same user — must be rejected
         r2 = await client.post("/api/v1/orders", json=payload, headers=h)
         assert r2.status_code == 400
-        assert "سهمیه" in r2.json()["detail"] or "سهمیه" in r2.text
+        assert "سهمیه" in str(r2.json()) or "سهمیه" in r2.text
 
         # Validate endpoint must also report per-user exhaustion for authenticated user
         v = await client.post("/api/v1/coupons/validate", json={"code": "PERUSER1", "order_total": 1000000}, headers=h)

@@ -184,11 +184,16 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   );
 }
 
-export function FormActions({ onCancel, busy, saveLabel = "ذخیره" }: { onCancel: () => void; busy?: boolean; saveLabel?: string }) {
+export function FormActions({ onCancel, busy, saveLabel = "ذخیره", onSave }: { onCancel: () => void; busy?: boolean; saveLabel?: string; onSave?: () => void }) {
   return (
     <div className="mt-6 flex justify-end gap-2 border-t border-char/10 pt-4 dark:border-white/10">
       <button type="button" onClick={onCancel} className="min-h-[44px] rounded-xl border border-char/20 px-5 text-sm transition-colors hover:bg-char/5 dark:border-white/20 dark:hover:bg-white/5">انصراف</button>
-      <button type="submit" disabled={busy} className="min-h-[44px] rounded-xl bg-lajvard px-6 text-sm text-white transition-all hover:bg-lajvard-deep hover:shadow-lifted disabled:opacity-50 dark:bg-lajvard-soft dark:text-char">
+      <button
+        type={onSave ? "button" : "submit"}
+        onClick={onSave}
+        disabled={busy}
+        className="min-h-[44px] rounded-xl bg-lajvard px-6 text-sm text-white transition-all hover:bg-lajvard-deep hover:shadow-lifted disabled:opacity-50 dark:bg-lajvard-soft dark:text-char"
+      >
         {busy ? "در حال ذخیره…" : saveLabel}
       </button>
     </div>
@@ -496,11 +501,13 @@ export function Carousel({ children }: { children: ReactNode }) {
   const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
 
   useEffect(() => {
-    if (!emblaApi) return;
+    if (!emblaApi) return undefined;
     const onSelect = () => setSelected(emblaApi.selectedScrollSnap());
     emblaApi.on("select", onSelect);
     onSelect();
-    return () => emblaApi.off("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
   }, [emblaApi]);
 
   return (

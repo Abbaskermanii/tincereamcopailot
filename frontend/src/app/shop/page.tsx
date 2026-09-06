@@ -3,54 +3,55 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShopProductGrid } from "@/components/store/shop-product-grid";
-import { ShopFilters } from "@/components/store/shop-filters";
+import { ShopFilters, ShopMobileFilters, ShopSidebar } from "@/components/store/shop-filters";
 
-export const metadata: Metadata = { title: "فروشگاه", description: "همه محصولات دست‌ساز تن‌سِرام" };
+export const metadata: Metadata = {
+  title: "فروشگاه",
+  description: "همه محصولات دست‌ساز آنیمور سرام؛ سفال و سرامیک دست‌ساز با لعاب‌دستی سنتی، مستقیم از کارگاه کرج.",
+  alternates: { canonical: "/shop" },
+};
 export const revalidate = 90;
-
-async function getBrands(): Promise<Array<{ slug: string; name: string }>> {
-  try {
-    const brands = await api.brands();
-    if (brands && Array.isArray(brands)) return brands.map((b) => ({ slug: b.slug, name: b.name }));
-    return [];
-  } catch {
-    return [];
-  }
-}
 
 export default async function ShopPage({
   searchParams,
 }: {
-  searchParams: { page?: string; sort?: string; category?: string; brand?: string; min_price?: string; max_price?: string; in_stock_only?: string };
+  searchParams: { page?: string; sort?: string; category?: string; min_price?: string; max_price?: string; in_stock_only?: string; q?: string };
 }) {
   const page = Math.max(1, Number(searchParams.page ?? 1));
   const sort = searchParams.sort ?? "newest";
+  const q = searchParams.q?.trim() || undefined;
   const categories = await api.categories();
-  const brands = await getBrands();
   const data = await api.products({
     page,
     page_size: 16,
     sort,
     category: searchParams.category,
-    brand: searchParams.brand,
     min_price: searchParams.min_price,
     max_price: searchParams.max_price,
     in_stock_only: searchParams.in_stock_only === "true",
+    search: q,
   });
 
   const query = new URLSearchParams();
   if (searchParams.category) query.set("category", searchParams.category);
-  if (searchParams.brand) query.set("brand", searchParams.brand);
   if (searchParams.min_price) query.set("min_price", searchParams.min_price);
   if (searchParams.max_price) query.set("max_price", searchParams.max_price);
   if (searchParams.in_stock_only) query.set("in_stock_only", searchParams.in_stock_only);
+  if (q) query.set("q", q);
 
   const activeFilters = {
     category: searchParams.category,
-    brand: searchParams.brand,
     min_price: searchParams.min_price,
     max_price: searchParams.max_price,
     in_stock_only: searchParams.in_stock_only,
+  };
+
+  const filterProps = {
+    categories: categories ?? [],
+    currentSort: sort,
+    totalProducts: data?.total ?? 0,
+    activeFilters,
+    searchQuery: q,
   };
 
   return (
@@ -58,22 +59,18 @@ export default async function ShopPage({
       {/* Header */}
       <div className="mb-8">
         <p className="text-sm text-ink-soft">قفسه‌ی آنلاین کارگاه</p>
-        <h1 className="mt-2 text-4xl font-extrabold">فروشگاه</h1>
+        <h1 className="mt-2 text-4xl font-extrabold">
+          {q ? `جست‌وجوی «${q}»` : "فروشگاه"}
+        </h1>
       </div>
 
-      {/* Filters & Grid Layout */}
-      <div className="flex gap-8">
-        {/* Desktop Sidebar + Mobile Sheet */}
-        <ShopFilters
-          categories={categories ?? []}
-          brands={brands}
-          currentSort={sort}
-          totalProducts={data?.total ?? 0}
-          activeFilters={activeFilters}
-        />
+      {/* Two-column: filters sidebar (right) + products (left) */}
+      <div className="flex flex-col gap-8 lg:flex-row">
+        <ShopSidebar {...filterProps} />
 
-        {/* Main Content */}
-        <div className="min-w-0 flex-1">
+        <div className="order-first min-w-0 flex-1 lg:order-none">
+          <ShopMobileFilters {...filterProps} />
+
           {!data || !data.items.length ? (
             <EmptyState
               title="محصولی پیدا نشد"

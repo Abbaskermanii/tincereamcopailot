@@ -54,7 +54,7 @@ export function FeaturedProducts({
           </Link>
         }
       />
-      <SmartCarousel minCardWidth={240} gap={12}>
+      <SmartCarousel minCardWidth={260} maxCardWidth={280} gap={16} minCardHeight={330}>
         {products.slice(0, 12).map((p) => (
           <ProductCard
             key={p.id}

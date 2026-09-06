@@ -12,7 +12,7 @@ import asyncio
 import json
 import random
 import string
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -24,14 +24,11 @@ from app.core.security import create_access_token, hash_password
 from app.db.session import engine as app_engine
 from app.main import app
 from app.models import (
-    Brand,
-    Campaign,
     Category,
     ContactMessage,
     Coupon,
     DiscountType,
     FAQItem,
-    HomepageSection,
     Notification,
     Order,
     OrderStatus,
@@ -40,7 +37,6 @@ from app.models import (
     ProductImage,
     ProductVariant,
     ShippingMethod,
-    StaticPage,
     User,
     Role,
 )
@@ -256,11 +252,6 @@ class TestCatalog:
         r = await client.get("/api/v1/categories/notfound123")
         assert r.status_code == 404
 
-    async def test_brands_public(self, client):
-        r = await client.get("/api/v1/brands")
-        assert r.status_code == 200
-        assert isinstance(r.json(), list)
-
     async def test_products_list(self, client, sample_product):
         # pagination
         r = await client.get("/api/v1/products?page=1&page_size=2")
@@ -281,10 +272,6 @@ class TestCatalog:
         if cats:
             r = await client.get(f"/api/v1/products?category={cats[0]['slug']}&page_size=2")
             assert r.status_code == 200
-        # brand filter (may be empty)
-        r = await client.get("/api/v1/products?brand=nonexistentbrand123&page_size=2")
-        assert r.status_code == 200
-        assert r.json()["total"] == 0
         # search
         r = await client.get("/api/v1/products?search=k@test&page_size=2")
         assert r.status_code == 200
@@ -511,15 +498,7 @@ class TestCommunity:
         r = await client.post("/api/v1/stock-notify", json={"product_id": "00000000-0000-0000-0000-000000000000", "contact": "09121234567"})
         assert r.status_code == 404
 
-    async def test_pages_faq_contact(self, client):
-        r = await client.get("/api/v1/pages")
-        assert r.status_code == 200
-        pages = r.json()
-        if pages:
-            r = await client.get(f"/api/v1/pages/{pages[0]['slug']}")
-            assert r.status_code == 200
-        r = await client.get("/api/v1/pages/notfound12345")
-        assert r.status_code == 404
+    async def test_faq_contact(self, client):
         r = await client.get("/api/v1/faq")
         assert r.status_code == 200
         r = await client.get("/api/v1/faq?category=ارسال")
@@ -528,12 +507,6 @@ class TestCommunity:
         assert r.status_code == 201
         r = await client.post("/api/v1/contact", json={"name": "a", "message": "short"})
         assert r.status_code == 422
-        # newsletter
-        email = _unique("nl") + "@example.com"
-        r = await client.post(f"/api/v1/newsletter?email={email}")
-        assert r.status_code == 200
-        r = await client.delete(f"/api/v1/newsletter/{email}")
-        assert r.status_code == 200
 
     async def test_articles(self, client):
         r = await client.get("/api/v1/articles")
@@ -567,12 +540,6 @@ class TestCommunity:
             assert r.status_code == 401
         app.dependency_overrides.clear()
 
-    async def test_homepage(self, client):
-        r = await client.get("/api/v1/homepage")
-        assert r.status_code == 200
-        j = r.json()
-        assert "sections" in j
-
     async def test_carousels_public(self, client):
         r = await client.get("/api/v1/carousels")
         assert r.status_code == 200
@@ -596,7 +563,7 @@ class TestFeeds:
 # ---------- 10. Admin ----------
 class TestAdmin:
     async def test_admin_requires_auth(self, client):
-        endpoints = ["/api/v1/admin/dashboard","/api/v1/admin/products","/api/v1/admin/categories","/api/v1/admin/brands","/api/v1/admin/orders","/api/v1/admin/users","/api/v1/admin/roles","/api/v1/admin/settings"]
+        endpoints = ["/api/v1/admin/dashboard","/api/v1/admin/products","/api/v1/admin/categories","/api/v1/admin/orders","/api/v1/admin/users","/api/v1/admin/roles",]
         for ep in endpoints:
             r = await client.get(ep)
             assert r.status_code == 401, f"{ep} should be 401 without auth"
@@ -630,19 +597,6 @@ class TestAdmin:
         r = await c.post("/api/v1/admin/categories", json={"name": "Dup", "slug": slug}, headers=h)
         assert r.status_code == 409
         r = await c.delete(f"/api/v1/admin/categories/{cat_id}", headers=h)
-        assert r.status_code == 200
-
-    async def test_admin_brands_crud(self, admin_client):
-        c, h, _ = admin_client
-        slug = _unique("brand")
-        r = await c.post("/api/v1/admin/brands", json={"name": "Test Brand", "slug": slug}, headers=h)
-        assert r.status_code == 201, r.text
-        bid = r.json()["id"]
-        r = await c.get("/api/v1/admin/brands", headers=h)
-        assert r.status_code == 200
-        r = await c.patch(f"/api/v1/admin/brands/{bid}", json={"name": "Updated Brand"}, headers=h)
-        assert r.status_code == 200
-        r = await c.delete(f"/api/v1/admin/brands/{bid}", headers=h)
         assert r.status_code == 200
 
     async def test_admin_products_crud(self, admin_client):
@@ -744,7 +698,7 @@ class TestAdmin:
         r = await c.get("/api/v1/admin/orders-v2?limit=2", headers=h)
         assert r.status_code == 200
 
-    async def test_admin_coupons_campaigns(self, admin_client):
+    async def test_admin_coupons(self, admin_client):
         c, h, _ = admin_client
         code = _unique("CPNADM")
         r = await c.post("/api/v1/admin/coupons", json={"code": code, "discount_type": "percentage", "discount_value": 10}, headers=h)
@@ -757,17 +711,6 @@ class TestAdmin:
         # duplicate code 409
         r = await c.post("/api/v1/admin/coupons", json={"code": code, "discount_type": "percentage", "discount_value": 10}, headers=h)
         assert r.status_code == 409
-        # campaigns
-        slug = _unique("camp")
-        r = await c.post("/api/v1/admin/campaigns", json={"name": "Test Camp", "slug": slug, "discount_type": "percentage", "discount_value": 10}, headers=h)
-        assert r.status_code == 201, r.text
-        camp_id = r.json()["id"]
-        r = await c.get("/api/v1/admin/campaigns", headers=h)
-        assert r.status_code == 200
-        r = await c.patch(f"/api/v1/admin/campaigns/{camp_id}", json={"discount_value": 15}, headers=h)
-        assert r.status_code == 200
-        r = await c.delete(f"/api/v1/admin/campaigns/{camp_id}", headers=h)
-        assert r.status_code == 200
         r = await c.delete(f"/api/v1/admin/coupons/{cid}", headers=h)
         assert r.status_code == 200
 
@@ -807,18 +750,8 @@ class TestAdmin:
             r = await c.patch(f"/api/v1/admin/questions/{qid}", json={"answer": "پاسخ تست", "is_published": True}, headers=h)
             assert r.status_code == 200
 
-    async def test_admin_pages_faq(self, admin_client):
+    async def test_admin_faq_content(self, admin_client):
         c, h, _ = admin_client
-        slug = _unique("page")
-        r = await c.post("/api/v1/admin/pages", json={"title": "Test Page", "slug": slug, "content": "hello"}, headers=h)
-        assert r.status_code == 201, r.text
-        pid = r.json()["id"]
-        r = await c.get("/api/v1/admin/pages", headers=h)
-        assert r.status_code == 200
-        r = await c.patch(f"/api/v1/admin/pages/{pid}", json={"title": "Updated"}, headers=h)
-        assert r.status_code == 200
-        r = await c.delete(f"/api/v1/admin/pages/{pid}", headers=h)
-        assert r.status_code == 200
         # faq
         r = await c.post("/api/v1/admin/faq", json={"question": "سوال؟", "answer": "جواب"}, headers=h)
         assert r.status_code == 201
@@ -848,20 +781,6 @@ class TestAdmin:
         r = await c.patch(f"/api/v1/admin/articles/{art_id}", json={"title": "Updated"}, headers=h)
         assert r.status_code == 200
         r = await c.delete(f"/api/v1/admin/articles/{art_id}", headers=h)
-        assert r.status_code == 200
-
-    async def test_admin_homepage(self, admin_client):
-        c, h, _ = admin_client
-        r = await c.get("/api/v1/admin/homepage-sections", headers=h)
-        assert r.status_code == 200
-        r = await c.post("/api/v1/admin/homepage-sections", json={"kind": "products", "title": "Test Section", "source": "new_arrivals"}, headers=h)
-        assert r.status_code == 201, r.text
-        sid = r.json()["id"]
-        r = await c.patch(f"/api/v1/admin/homepage-sections/{sid}", json={"title": "Updated"}, headers=h)
-        assert r.status_code == 200
-        r = await c.post("/api/v1/admin/homepage-sections/reorder", json={"order": [sid]}, headers=h)
-        assert r.status_code == 200
-        r = await c.delete(f"/api/v1/admin/homepage-sections/{sid}", headers=h)
         assert r.status_code == 200
 
     async def test_admin_media_upload(self, admin_client):
@@ -894,35 +813,11 @@ class TestAdmin:
         r = await c.delete(f"/api/v1/admin/roles/{rid}", headers=h)
         assert r.status_code == 200
 
-    async def test_admin_settings_activity(self, admin_client):
-        c, h, _ = admin_client
-        r = await c.get("/api/v1/admin/settings", headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/settings/definitions", headers=h)
-        assert r.status_code == 200
-        r = await c.put("/api/v1/admin/settings/bulk", json={"store_name": "تست"}, headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/activity?limit=5", headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/analytics", headers=h)
-        assert r.status_code == 200
-
     async def test_admin_misc(self, admin_client):
         c, h, _ = admin_client
-        r = await c.get("/api/v1/admin/stock-alerts?threshold=5", headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/stock-notify", headers=h)
-        assert r.status_code == 200
         r = await c.get("/api/v1/admin/coupon-redemptions", headers=h)
         assert r.status_code == 200
         r = await c.get("/api/v1/admin/messages", headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/newsletter", headers=h)
-        assert r.status_code == 200
-        r = await c.get("/api/v1/admin/notifications", headers=h)
-        assert r.status_code == 200
-        # broadcast
-        r = await c.post("/api/v1/admin/notifications/broadcast", json={"title": "Test", "body": "hello"}, headers=h)
         assert r.status_code == 200
         # carousels admin
         r = await c.get("/api/v1/admin/carousels", headers=h)
@@ -1009,8 +904,8 @@ class TestSecurity:
         # svg with script should be rejected (only jpg/png/webp allowed)
         r = await c.post("/api/v1/admin/media/upload", files={"file": ("evil.svg", io.BytesIO(b"<svg onload=alert(1)>"), "image/svg+xml")}, headers=h)
         assert r.status_code == 415
-        # oversized
-        big = b"a" * (6 * 1024 * 1024)
+        # oversized (server limit defaults to 10 MB)
+        big = b"a" * (11 * 1024 * 1024)
         r = await c.post("/api/v1/admin/media/upload", files={"file": ("big.jpg", io.BytesIO(big), "image/jpeg")}, headers=h)
         assert r.status_code == 413
 
@@ -1060,17 +955,3 @@ class TestCache:
         # next fetch should reflect new price or at least not 500 (cache invalidated via logic? Actually catalog cache not invalidated on patch except homepage — so stale for 60s but not 500)
         r2 = await client.get("/api/v1/products?page=1&page_size=2")
         assert r2.status_code == 200
-
-    async def test_homepage_cache(self, client, admin_client):
-        r1 = await client.get("/api/v1/homepage")
-        assert r1.status_code == 200
-        c, h, _ = admin_client
-        # create section should invalidate
-        r = await c.post("/api/v1/admin/homepage-sections", json={"kind": "products", "title": "Cache Test", "source": "new_arrivals"}, headers=h)
-        assert r.status_code == 201
-        sid = r.json()["id"]
-        r2 = await client.get("/api/v1/homepage")
-        assert r2.status_code == 200
-        # should contain new section or at least not error
-        await c.delete(f"/api/v1/admin/homepage-sections/{sid}", headers=h)
-

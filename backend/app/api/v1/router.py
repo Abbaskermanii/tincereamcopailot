@@ -13,7 +13,6 @@ from app.api.v1.payments import router as payments_router
 from app.api.v1.search import router as search_router
 from app.api.v1.auth import admin_router, router as auth_router, users_router, wishlist_router
 from app.api.v1.cart import router as cart_router
-from app.api.v1.homepage import router as homepage_router
 from app.api.v1.operations import admin as operations_admin, public as operations_public
 from app.services.storage import read_image
 
@@ -56,7 +55,6 @@ api_router.include_router(operations_public, tags=["content", "operations"])
 api_router.include_router(community_public, tags=["content", "community"])
 api_router.include_router(admin_api_router, tags=["admin"])
 api_router.include_router(cart_router, tags=["cart"])
-api_router.include_router(homepage_router, tags=["homepage"])
 
 
 @api_router.get("/health", tags=["system"])

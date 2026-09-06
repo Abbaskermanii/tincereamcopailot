@@ -17,12 +17,10 @@ from app.models import (
     Coupon,
     DiscountType,
     FAQItem,
-    HomepageSection,
     Product,
     ProductImage,
     Role,
     ShippingMethod,
-    StaticPage,
     User,
 )
 from app.services.storage import put_image
@@ -169,17 +167,6 @@ def _seed_ops_data(session: Session) -> None:
         if not first(ShippingMethod, code=m["code"]):
             session.add(ShippingMethod(**m))
 
-    # static pages
-    pages = [
-        dict(title="درباره تن‌سِرام", slug="about", content="<p>تن‌سِرام فروشگاه صنایع دستی سرامیکی است.</p>", is_published=True, sort_order=1),
-        dict(title="شرایط استفاده", slug="terms", content="<p>با استفاده از سایت شرایط را می‌پذیرید.</p>", is_published=True, sort_order=2),
-        dict(title="حریم خصوصی", slug="privacy-policy", content="<p>اطلاعات شما محفوظ است.</p>", is_published=True, sort_order=3),
-        dict(title="قوانین مرجوعی", slug="returns-policy", content="<p>تا ۷ روز امکان مرجوعی وجود دارد.</p>", is_published=True, sort_order=4),
-    ]
-    for pg in pages:
-        if not first(StaticPage, slug=pg["slug"]):
-            session.add(StaticPage(**pg))
-
     faqs = [
         ("سفارش من چه زمانی ارسال می‌شود؟", "سفارش‌ها حداکثر تا ۲ روز کاری پس از تأیید پرداخت ارسال می‌شوند.", "ارسال", 1),
         ("امکان مرجوع کردن کالا وجود دارد؟", "بله، تا ۷ روز پس از تحویل می‌توانید درخواست مرجوعی ثبت کنید.", "مرجوعی", 2),
@@ -190,13 +177,6 @@ def _seed_ops_data(session: Session) -> None:
     if not existing_faqs:
         for q, a, cat, order in faqs:
             session.add(FAQItem(question=q, answer=a, category=cat, sort_order=order))
-
-    # homepage layout (only on first run)
-    existing_sections = session.exec(select(func.count()).select_from(HomepageSection.__table__)).one()
-    if not existing_sections:
-        from app.services.homepage import default_sections
-        for section in default_sections():
-            session.add(section)
 
 
 def is_seeded(session: Session) -> bool:

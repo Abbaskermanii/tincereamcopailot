@@ -4,7 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import useEmblaCarousel from "embla-carousel-react";
 import { useEffect, useState } from "react";
+import { ChevronLeft } from "lucide-react";
 import { mediaUrl } from "@/lib/api";
+import { faNum } from "@/lib/format";
 
 export interface HeroSlide {
   id: string;
@@ -21,9 +23,9 @@ interface HomeHeroProps {
 function getSlideMeta(slide: HeroSlide, index: number) {
   const defaults: { eyebrow: string; description: string; cta: string; ctaHref: string }[] = [
     {
-      eyebrow: "سفال دست‌ساز",
+      eyebrow: "سفال دست‌ساز ایرانی",
       description: "هر قطعه حاصل دقت، صبر و عشق به هنر سفالگری است.",
-      cta: "مشاهده مجموعه",
+      cta: "مشاهده فروشگاه",
       ctaHref: slide.link_url ?? "/shop",
     },
     {
@@ -33,7 +35,7 @@ function getSlideMeta(slide: HeroSlide, index: number) {
       ctaHref: slide.link_url ?? "/shop",
     },
     {
-      eyebrow: "از کارگاه تن‌سِرام",
+      eyebrow: "از کارگاه آنیمور سرام",
       description: "ساخته‌شده با خاک، آب و آتش در قلب ایران.",
       cta: "داستان ما",
       ctaHref: slide.link_url ?? "/about",
@@ -48,11 +50,16 @@ function getSlideMeta(slide: HeroSlide, index: number) {
   return defaults[index % defaults.length]!;
 }
 
+/**
+ * Slim campaign-banner hero: the dashboard slide's photo fills a short
+ * rounded card, copy sits on a soft right-side scrim. Deliberately low
+ * (≈260–290px) so the page content starts immediately below the fold.
+ */
 export function HomeHero({ slides }: HomeHeroProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
     direction: "rtl",
-    duration: 30,
+    duration: 32,
   });
   const [selected, setSelected] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -77,7 +84,7 @@ export function HomeHero({ slides }: HomeHeroProps) {
       clearInterval(id);
       id = setInterval(() => {
         if (!isPaused && !isReducedMotion) emblaApi.scrollNext();
-      }, 6000);
+      }, 6500);
     };
     startAutoplay();
 
@@ -90,141 +97,138 @@ export function HomeHero({ slides }: HomeHeroProps) {
   if (!slides.length) return null;
 
   return (
-    <section
-      aria-label="بنرهای ویژه"
-      className="relative mb-8 mt-4 md:mb-12 md:mt-6"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-    >
-      <div className="overflow-hidden rounded-2xl md:rounded-3xl" ref={emblaRef}>
-        <div className="flex">
-          {slides.map((s, idx) => {
-            const meta = getSlideMeta(s, idx);
-            const isActive = idx === selected;
-
-            return (
+    <section aria-label="بنرهای ویژه" className="mb-8 mt-4 md:mb-10 md:mt-5">
+      <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-wobble-card shadow-lifted" ref={emblaRef}>
+          <div className="flex">
+            {slides.map((s, idx) => (
               <div key={s.id} className="min-w-0 flex-[0_0_100%]">
-                {s.link_url ? (
-                  <Link href={s.link_url} className="block" aria-label={s.title ?? meta.eyebrow}>
-                    <SlideContent slide={s} meta={meta} isActive={isActive} isReducedMotion={isReducedMotion} isPriority={idx === 0} />
-                  </Link>
-                ) : (
-                  <SlideContent slide={s} meta={meta} isActive={isActive} isReducedMotion={isReducedMotion} isPriority={idx === 0} />
-                )}
+                <HeroSlideCard
+                  slide={s}
+                  index={idx}
+                  total={slides.length}
+                  selected={selected}
+                  isActive={idx === selected}
+                  isReducedMotion={isReducedMotion}
+                  isPriority={idx === 0}
+                />
               </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Navigation arrows - desktop only */}
-      {slides.length > 1 && (
-        <>
-          <button
-            aria-label="اسلاید قبلی"
-            onClick={(e) => { e.preventDefault(); emblaApi?.scrollPrev(); }}
-            className="absolute left-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/15 p-2.5 text-white backdrop-blur-md transition-all hover:bg-white/25 md:left-5 md:p-3.5"
-          >
-            <svg className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-          <button
-            aria-label="اسلاید بعدی"
-            onClick={(e) => { e.preventDefault(); emblaApi?.scrollNext(); }}
-            className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/15 p-2.5 text-white backdrop-blur-md transition-all hover:bg-white/25 md:right-5 md:p-3.5"
-          >
-            <svg className="h-4 w-4 md:h-5 md:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-
-          {/* Dots */}
-          <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                aria-label={`رفتن به اسلاید ${i + 1}`}
-                onClick={(e) => { e.preventDefault(); emblaApi?.scrollTo(i); }}
-                className={`rounded-full transition-all duration-500 ${
-                  i === selected
-                    ? "h-2 w-8 bg-white"
-                    : "h-2 w-2 bg-white/40 hover:bg-white/70"
-                }`}
-              />
             ))}
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </section>
   );
 }
 
-function SlideContent({
+function HeroSlideCard({
   slide,
-  meta,
+  index,
+  total,
+  selected,
   isActive,
   isReducedMotion,
   isPriority,
 }: {
   slide: HeroSlide;
-  meta: { eyebrow: string; description: string; cta: string; ctaHref: string };
+  index: number;
+  total: number;
+  selected: number;
   isActive: boolean;
   isReducedMotion: boolean;
   isPriority: boolean;
 }) {
+  const meta = getSlideMeta(slide, index);
+  const title = slide.title || meta.eyebrow;
+  const description = slide.subtitle || meta.description;
+  const hasImage = Boolean(slide.image_url);
+
   return (
-    <div className="relative aspect-[16/8] min-h-[320px] overflow-hidden bg-char md:aspect-[16/6.5] md:min-h-[420px] lg:min-h-[480px]">
-      {/* Image */}
+    <div className="relative h-[250px] overflow-hidden bg-[#1b2433] md:h-[270px] lg:h-[290px]">
+      {/* Slide photo fills the card */}
       <div className="absolute inset-0">
-        <Image
-          src={mediaUrl(slide.image_url)}
-          alt={slide.title ?? meta.eyebrow}
-          fill
-          priority={isPriority}
-          sizes="100vw"
-          className={`object-cover transition-transform duration-[2000ms] ease-out ${
-            isActive && !isReducedMotion ? "scale-105" : "scale-100"
-          }`}
-        />
+        {hasImage ? (
+          <Image
+            src={mediaUrl(slide.image_url)}
+            alt={title}
+            fill
+            priority={isPriority}
+            sizes="(max-width: 768px) 100vw, 80vw"
+            className={`object-cover transition-transform duration-[2400ms] ease-out ${
+              isActive && !isReducedMotion ? "scale-105" : "scale-100"
+            }`}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-l from-kiln-clay/40 via-[#1b2433] to-lajvard/50">
+            <svg className="h-16 w-16 text-white/15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round">
+              <path d="M7 21h10M8 21v-4a4 4 0 014-4 4 4 0 014 4v4M12 13V9m0 0a4 4 0 100-8 4 4 0 000 8z" />
+            </svg>
+          </div>
+        )}
       </div>
 
-      {/* Gradient overlays */}
-      <div className="absolute inset-0 bg-gradient-to-l from-black/70 via-black/30 to-black/10" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:from-transparent" />
+      {/* Soft scrim — dark on the right where the copy sits */}
+      <div className="absolute inset-0 bg-gradient-to-l from-black/75 via-black/40 to-black/5" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-      {/* Content */}
-      <div className="absolute inset-0 flex items-center">
-        <div className="w-full px-6 py-8 md:px-12 lg:px-16">
-          <div className="max-w-lg space-y-4 md:space-y-5">
-            {/* Eyebrow */}
-            <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80 backdrop-blur-sm md:text-xs">
-              {meta.eyebrow}
-            </span>
+      {/* Copy — right side in RTL */}
+      <div className="absolute inset-y-0 right-0 flex w-full max-w-[560px] flex-col justify-center py-5 pl-6 pr-5 sm:pr-8 md:pr-10">
+        <span
+          key={`b-${slide.id}`}
+          className={`inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[9px] font-bold tracking-[0.12em] text-white/80 backdrop-blur-sm md:text-[10px] ${
+            isActive && !isReducedMotion ? "animate-fade-in" : ""
+          }`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-clay-soft" />
+          {meta.eyebrow}
+        </span>
 
-            {/* Headline */}
-            {slide.title && (
-              <h2 className="text-3xl font-extrabold leading-[1.2] text-white drop-shadow-lg md:text-4xl lg:text-[3.25rem]">
-                {slide.title}
-              </h2>
-            )}
+        <h2
+          key={`t-${slide.id}`}
+          className={`mt-2.5 line-clamp-2 text-xl font-extrabold leading-[1.35] text-white drop-shadow-md md:text-2xl md:leading-[1.35] lg:text-[1.9rem] ${
+            isActive && !isReducedMotion ? "animate-fade-in" : ""
+          }`}
+        >
+          {title}
+        </h2>
 
-            {/* Description */}
-            <p className="max-w-md text-sm leading-7 text-white/75 md:text-base lg:text-lg lg:leading-8">
-              {slide.subtitle || meta.description}
-            </p>
+        <p className="mt-1.5 line-clamp-1 text-[11px] leading-5 text-white/70 md:text-[13px] md:leading-6">
+          {description}
+        </p>
 
-            {/* CTA */}
-            <div className="pt-1">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-bold text-char transition-all duration-300 hover:bg-kiln-clay hover:text-white dark:bg-white/90 dark:text-char dark:hover:bg-kiln-clay">
-                {meta.cta}
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </span>
-            </div>
-          </div>
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <Link
+            href={meta.ctaHref}
+            className="group inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-xs font-bold text-char shadow-md transition-all duration-300 hover:bg-kiln-clay hover:text-white"
+          >
+            {meta.cta}
+            <ChevronLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+          </Link>
+          <Link
+            href="/about"
+            className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-bold text-white backdrop-blur-sm transition-colors hover:border-white/45 hover:bg-white/20"
+          >
+            داستان ما
+          </Link>
         </div>
+
+        {/* Slide indicators */}
+        {total > 1 && (
+          <div className="mt-4 flex items-center gap-1.5" dir="ltr">
+            {Array.from({ length: total }, (_, i) => (
+              <span
+                key={i}
+                aria-hidden="true"
+                className={`h-1 rounded-full transition-all duration-500 ${
+                  i === selected ? "w-6 bg-white" : "w-1.5 bg-white/30"
+                }`}
+              />
+            ))}
+            <span className="num-latin mr-2 text-[9px] font-bold text-white/40">
+              {faNum(selected + 1)} / {faNum(total)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

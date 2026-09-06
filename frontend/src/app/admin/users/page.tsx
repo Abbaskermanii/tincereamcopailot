@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
     customer: "مشتری",
   };
 
-  const roleColors = {
+  const roleColors: Record<string, string> = {
     admin: "bg-firouzeh/20 text-firouzeh",
     editor: "bg-lajvard/20 text-lajvard",
     customer: "bg-amber-500/20 text-amber-700",
@@ -441,7 +441,7 @@ export default function AdminUsersPage() {
             <FormActions
               onCancel={() => setShowSettings(null)}
               busy={busy}
-              onConfirm={() => void submit()}
+              onSave={() => void submit()}
             />
           </div>
         )}

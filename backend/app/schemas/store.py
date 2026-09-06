@@ -16,11 +16,12 @@ class CategoryNode(BaseModel):
     slug: str
     image_url: str | None = None
     description: str | None = None
+    product_count: int = 0
     children: list["CategoryNode"] = []
 
 
 class CategoryDetail(CategoryNode):
-    product_count: int = 0
+    pass
 
 
 # ---------- Products ----------

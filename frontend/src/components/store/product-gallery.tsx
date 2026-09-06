@@ -58,7 +58,7 @@ export function ProductGallery({
   return (
     <div className="space-y-3">
       <div className="relative">
-        <div ref={emblaRef} className="overflow-hidden rounded-wobble">
+        <div ref={emblaRef} className="overflow-hidden rounded-wobble-card shadow-shelf">
           <div className="flex touch-pan-y">
             {images.map((img, idx) => (
               <button
@@ -143,7 +143,7 @@ export function ProductGallery({
                 alt={lightboxImage.alt}
                 fill
                 sizes="90vw"
-                className="rounded-wobble object-contain"
+                className="rounded-wobble-card object-contain"
               />
             </div>
             <Dialog.Close

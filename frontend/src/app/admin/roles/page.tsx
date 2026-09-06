@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ShieldCheck, Plus } from "lucide-react";
+import { ShieldCheck, Plus, Users } from "lucide-react";
 import { ConfirmDialog, EmptyState, ErrorBanner, Field, FormActions, Modal, PageHeader, TagBadge, TextInput, Toolbar } from "@/components/admin/kit";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
 
@@ -10,15 +10,17 @@ interface Role {
 }
 
 interface PermCatalog {
-  permissions: string[];
-  presets: Record<string, string[]>;
+  /** permission key → Persian label (from backend catalog) */
+  permissions: Record<string, string>;
+  presets: Array<{ name: string; label?: string; permissions: string[] }> | Record<string, string[]>;
 }
 
-const PERMISSION_LABELS: Record<string, string> = {
+/** Fallback labels for legacy permission keys that no longer exist in the catalog */
+const LEGACY_LABELS: Record<string, string> = {
   dashboard: "داشبورد", products: "محصولات", categories: "دسته‌بندی‌ها",
   orders: "سفارش‌ها", returns: "مرجوعی‌ها", coupons: "تخفیف‌ها",
-  users: "کاربران", reviews: "نظرات و پرسش‌ها", messages: "پیام‌ها",
-  content: "محتوا", settings: "تنظیمات", shipping: "ارسال",
+  shipping: "ارسال", users: "کاربران", reviews: "نظرات و پرسش‌ها",
+  messages: "پیام‌ها", content: "محتوا", settings: "تنظیمات (حذف‌شده)",
 };
 
 export default function AdminRolesPage() {
@@ -31,6 +33,10 @@ export default function AdminRolesPage() {
   const { data: roles, loading, error, reload } = useAdminResource<Role[]>("/admin/roles");
   const { data: catalog } = useAdminResource<PermCatalog>("/admin/permissions");
   const { mutate, busy } = useAdminMutation();
+
+  /** key → Persian label, merged from backend catalog + legacy fallbacks */
+  const permLabels: Record<string, string> = { ...LEGACY_LABELS, ...(catalog?.permissions ?? {}) };
+  const permEntries = Object.entries(catalog?.permissions ?? {});
 
   const filtered = (roles ?? []).filter((r) => !search || r.name.includes(search));
 
@@ -61,12 +67,17 @@ export default function AdminRolesPage() {
     if (ok) { setDeleting(null); void reload(); }
   };
 
+  /** Normalize presets: backend sends ROLE_PRESETS (array of {name,label,permissions}) */
+  const presets: Array<{ name: string; label: string; perms: string[] }> = Array.isArray(catalog?.presets)
+    ? (catalog?.presets as Array<{ name: string; label?: string; permissions: string[] }>).map((p) => ({ name: p.name, label: p.label ?? p.name, perms: p.permissions }))
+    : Object.entries(catalog?.presets ?? {}).map(([name, perms]) => ({ name, label: name, perms: perms as string[] }));
+
   return (
     <div>
       <PageHeader
         title="نقش‌ها و دسترسی‌ها"
         description="مدیریت سطوح دسترسی مدیران"
-        action={<button type="button" onClick={openCreate} className="glaze-edge min-h-[44px] rounded-xl bg-lajvard px-5 text-sm text-white transition-all hover:bg-lajvard-deep hover:shadow-lifted dark:bg-lajvard-soft dark:text-char"><Plus className="ml-1 inline h-4 w-4" /> نقش جدید</button>}
+        action={<button type="button" onClick={openCreate} className="glaze-edge flex min-h-[44px] items-center rounded-wobble-card bg-lajvard px-5 text-sm text-white shadow-shelf transition-all hover:bg-lajvard-deep hover:shadow-lifted dark:bg-lajvard-soft dark:text-char"><Plus className="ml-1 inline h-4 w-4" /> نقش جدید</button>}
       />
 
       {error && <ErrorBanner message={error} onRetry={reload} />}
@@ -76,20 +87,28 @@ export default function AdminRolesPage() {
       {filtered.length === 0 && !loading ? (
         <EmptyState icon={<ShieldCheck className="h-12 w-12" />} title="هنوز نقشی ندارید" description="نقش‌ها به شما امکان کنترل دقیق دسترسی مدیران را می‌دهند." action={<button type="button" onClick={openCreate} className="min-h-[44px] rounded-xl bg-lajvard px-4 text-sm text-white dark:bg-lajvard-soft dark:text-char">+ ایجاد نقش</button>} />
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
           {filtered.map((r) => (
-            <div key={r.id} className="glaze-edge flex flex-wrap items-center justify-between gap-4 rounded-wobble bg-surface p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted dark:bg-black/25">
-              <div className="min-w-0 flex-1">
-                <p className="font-bold">{r.name}</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {r.permissions.map((p) => (
-                    <TagBadge key={p}>{PERMISSION_LABELS[p] ?? p}</TagBadge>
-                  ))}
+            <div key={r.id} className="glaze-edge flex flex-col justify-between gap-4 rounded-wobble-card bg-surface p-5 shadow-shelf transition-all duration-300 hover:shadow-lifted dark:bg-black/25">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-lajvard dark:text-lajvard-soft" />
+                  <p className="font-bold">{r.name}</p>
+                  <span className="mr-auto flex items-center gap-1 text-[11px] text-ink-soft">
+                    <Users className="h-3 w-3" /> {r.permissions.length} دسترسی
+                  </span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {r.permissions.includes("*") ? (
+                    <TagBadge>دسترسی کامل</TagBadge>
+                  ) : (
+                    r.permissions.map((p) => <TagBadge key={p}>{permLabels[p] ?? p}</TagBadge>)
+                  )}
                   {r.permissions.length === 0 && <span className="text-sm text-ink-soft">بدون دسترسی</span>}
                 </div>
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => openEdit(r)} className="glaze-edge min-h-[36px] rounded-lg border border-char/20 px-3 py-1.5 text-sm transition-all hover:shadow-shelf dark:border-white/20">ویرایش</button>
+                <button type="button" onClick={() => openEdit(r)} className="min-h-[36px] flex-1 rounded-lg border border-char/20 px-3 py-1.5 text-sm transition-colors hover:bg-char/5 dark:border-white/20 dark:hover:bg-white/5">ویرایش</button>
                 <button type="button" onClick={() => setDeleting(r)} className="min-h-[36px] rounded-lg px-3 py-1.5 text-sm text-clay transition-colors hover:bg-clay/10">حذف</button>
               </div>
             </div>
@@ -104,13 +123,13 @@ export default function AdminRolesPage() {
           </Field>
 
           {/* Presets */}
-          {catalog?.presets && Object.keys(catalog.presets).length > 0 && (
+          {presets.length > 0 && (
             <div>
               <p className="mb-2 text-sm font-medium">قالب‌های آماده</p>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(catalog.presets).map(([name, perms]) => (
-                  <button key={name} type="button" onClick={() => applyPreset(perms)} className="glaze-edge min-h-[36px] rounded-lg border border-char/20 px-3 text-sm transition-all hover:shadow-shelf dark:border-white/20">
-                    {name}
+                {presets.map((p) => (
+                  <button key={p.name} type="button" onClick={() => applyPreset(p.perms)} className="min-h-[36px] rounded-lg border border-char/20 px-3 text-sm transition-all hover:border-lajvard/40 hover:bg-lajvard/5 dark:border-white/20">
+                    {p.label}
                   </button>
                 ))}
               </div>
@@ -121,12 +140,15 @@ export default function AdminRolesPage() {
           <div>
             <p className="mb-2 text-sm font-medium">دسترسی‌ها ({form.permissions.length} انتخاب‌شده)</p>
             <div className="grid gap-2 sm:grid-cols-2">
-              {(catalog?.permissions ?? []).map((p) => (
-                <label key={p} className={`glaze-edge flex min-h-[40px] items-center gap-3 rounded-xl border px-3 text-sm transition-all ${form.permissions.includes(p) ? "border-firouzeh/30 bg-firouzeh/10 text-firouzeh" : "border-char/15 hover:bg-char/5 dark:border-white/15 dark:hover:bg-white/5"}`}>
-                  <input type="checkbox" checked={form.permissions.includes(p)} onChange={() => togglePerm(p)} className="h-4 w-4 rounded" />
-                  {PERMISSION_LABELS[p] ?? p}
-                </label>
-              ))}
+              {permEntries.map(([key, label]) => {
+                const active = form.permissions.includes(key) || form.permissions.includes("*");
+                return (
+                  <label key={key} className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border px-3 text-sm transition-all ${active ? "border-firouzeh/40 bg-firouzeh/10 font-medium text-firouzeh" : "border-char/15 hover:bg-char/5 dark:border-white/15 dark:hover:bg-white/5"}`}>
+                    <input type="checkbox" checked={active} onChange={() => togglePerm(key)} className="h-4 w-4 rounded accent-firouzeh" />
+                    {label}
+                  </label>
+                );
+              })}
             </div>
           </div>
 

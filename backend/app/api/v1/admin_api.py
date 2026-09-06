@@ -19,21 +19,16 @@ from app.api.v1.auth import admin_user
 from app.core.permissions import PERMISSIONS, ROLE_PRESETS, require_permission
 from app.db.session import get_session
 from app.models import (
-    ActivityLog,
     Article,
     ArticleCategory,
     Attribute,
     AttributeValue,
-    Brand,
-    Campaign,
     Category,
     ContactMessage,
     Coupon,
     CouponRedemption,
     DiscountType,
     FAQItem,
-    HomepageSection,
-    HomepageSectionKind,
     Notification,
     Order,
     OrderItem,
@@ -44,28 +39,22 @@ from app.models import (
     ProductImage,
     ProductQuestion,
     ProductReview,
-    ProductSource,
     ProductVariant,
     ReturnRequest,
     Setting,
     ShippingMethod,
-    StaticPage,
     StockNotifyRequest,
     User,
     Role,
 )
-from app.services.activity import log_activity
 from app.services.cache import cache_delete_pattern
-from app.services.homepage import default_sections, invalidate_home
 from app.services.orders import add_status_history, cancel_order_and_restock
 from app.services.storage import put_image
 
 admin = APIRouter(prefix="/admin")
 
-
 def _require_perm(perm: str):
     return Depends(require_permission(perm))
-
 
 # ============================ Dashboard ============================
 
@@ -182,61 +171,6 @@ def dashboard(
         "recent_orders": recent_orders,
     }
 
-
-# ============================ Brands ============================
-
-class BrandIn(BaseModel):
-    name: str
-    slug: str
-    description: str | None = None
-    logo_url: str | None = None
-    is_active: bool = True
-
-
-@admin.get("/brands")
-def list_brands(_: None = _require_perm("categories"), session: Session = Depends(get_session)):
-    return session.exec(select(Brand).order_by(Brand.name)).all()
-
-
-@admin.post("/brands", status_code=201)
-def create_brand(payload: BrandIn, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
-    if session.exec(select(Brand).where(Brand.slug == payload.slug)).first():
-        raise HTTPException(409, "slug برند تکراری است.")
-    row = Brand(**payload.model_dump())
-    session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="brand", entity_id=row.id, metadata={"name": row.name})
-    session.commit()
-    session.refresh(row)
-    return row
-
-
-@admin.patch("/brands/{brand_id}")
-def update_brand(brand_id: str, payload: dict, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
-    row = session.get(Brand, brand_id)
-    if not row:
-        raise HTTPException(404, "برند یافت نشد.")
-    for key in ("name", "slug", "description", "logo_url", "is_active"):
-        if key in payload:
-            setattr(row, key, payload[key])
-    log_activity(session, actor_id=user.id, action="update", entity_type="brand", entity_id=row.id)
-    session.add(row)
-    session.commit()
-    return row
-
-
-@admin.delete("/brands/{brand_id}")
-def delete_brand(brand_id: str, user: User = Depends(require_permission("categories")), session: Session = Depends(get_session)):
-    row = session.get(Brand, brand_id)
-    if not row:
-        raise HTTPException(404, "برند یافت نشد.")
-    if session.exec(select(Product).where(Product.brand_id == brand_id)).first():
-        raise HTTPException(409, "این برند دارای محصول است.")
-    session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="brand", entity_id=brand_id)
-    session.commit()
-    return {"ok": True}
-
-
 # ============================ Product variants ============================
 
 class VariantIn(BaseModel):
@@ -249,13 +183,11 @@ class VariantIn(BaseModel):
     sort_order: int = 0
     is_active: bool = True
 
-
 @admin.get("/products/{product_id}/variants")
 def list_variants(product_id: str, _: None = _require_perm("products"), session: Session = Depends(get_session)):
     return session.exec(
         select(ProductVariant).where(ProductVariant.product_id == product_id).order_by(ProductVariant.sort_order)  # type: ignore[arg-type]
     ).all()
-
 
 @admin.post("/products/{product_id}/variants", status_code=201)
 def create_variant(product_id: str, payload: VariantIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -265,12 +197,10 @@ def create_variant(product_id: str, payload: VariantIn, user: User = Depends(req
         raise HTTPException(409, "SKU وارینت تکراری است.")
     row = ProductVariant(product_id=product_id, **payload.model_dump())
     session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="variant", entity_id=row.id, metadata={"product_id": product_id, "name": row.name})
     session.commit()
     cache_delete_pattern("products:*")
     session.refresh(row)
     return row
-
 
 @admin.patch("/variants/{variant_id}")
 def update_variant(variant_id: str, payload: dict, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -280,12 +210,10 @@ def update_variant(variant_id: str, payload: dict, user: User = Depends(require_
     for key in ("name", "sku", "image_url", "price_delta", "absolute_price", "stock_qty", "sort_order", "is_active"):
         if key in payload:
             setattr(row, key, payload[key])
-    log_activity(session, actor_id=user.id, action="update", entity_type="variant", entity_id=row.id)
     session.add(row)
     session.commit()
     cache_delete_pattern("products:*")
     return row
-
 
 @admin.delete("/variants/{variant_id}")
 def delete_variant(variant_id: str, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -293,11 +221,9 @@ def delete_variant(variant_id: str, user: User = Depends(require_permission("pro
     if not row:
         raise HTTPException(404, "وارینت یافت نشد.")
     session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="variant", entity_id=variant_id)
     session.commit()
     cache_delete_pattern("products:*")
     return {"ok": True}
-
 
 # ============================ Reviews & Q&A moderation ============================
 
@@ -327,11 +253,9 @@ def admin_reviews(
         })
     return out
 
-
 class ReviewModerateIn(BaseModel):
     is_approved: bool | None = None
     admin_reply: str | None = None
-
 
 @admin.patch("/reviews/{review_id}")
 def moderate_review(review_id: str, payload: ReviewModerateIn, user: User = Depends(require_permission("reviews")), session: Session = Depends(get_session)):
@@ -343,11 +267,9 @@ def moderate_review(review_id: str, payload: ReviewModerateIn, user: User = Depe
     if payload.admin_reply is not None:
         row.admin_reply = payload.admin_reply
         row.replied_at = datetime.now(UTC)
-    log_activity(session, actor_id=user.id, action="moderate", entity_type="review", entity_id=row.id, metadata=payload.model_dump(exclude_unset=True))
     session.add(row)
     session.commit()
     return row
-
 
 @admin.delete("/reviews/{review_id}")
 def delete_review(review_id: str, user: User = Depends(require_permission("reviews")), session: Session = Depends(get_session)):
@@ -355,10 +277,8 @@ def delete_review(review_id: str, user: User = Depends(require_permission("revie
     if not row:
         raise HTTPException(404, "نظر یافت نشد.")
     session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="review", entity_id=review_id)
     session.commit()
     return {"ok": True}
-
 
 @admin.get("/questions")
 def admin_questions(published: bool | None = None, _: None = _require_perm("reviews"), session: Session = Depends(get_session)):
@@ -378,11 +298,9 @@ def admin_questions(published: bool | None = None, _: None = _require_perm("revi
         })
     return out
 
-
 class QuestionAnswerIn(BaseModel):
     answer: str = Field(min_length=1, max_length=4000)
     is_published: bool = True
-
 
 @admin.patch("/questions/{question_id}")
 def answer_question(question_id: str, payload: QuestionAnswerIn, user: User = Depends(require_permission("reviews")), session: Session = Depends(get_session)):
@@ -392,11 +310,9 @@ def answer_question(question_id: str, payload: QuestionAnswerIn, user: User = De
     row.answer = payload.answer
     row.is_published = payload.is_published
     row.answered_by = user.id
-    log_activity(session, actor_id=user.id, action="answer", entity_type="question", entity_id=row.id)
     session.add(row)
     session.commit()
     return row
-
 
 @admin.delete("/questions/{question_id}")
 def delete_question(question_id: str, user: User = Depends(require_permission("reviews")), session: Session = Depends(get_session)):
@@ -407,86 +323,7 @@ def delete_question(question_id: str, user: User = Depends(require_permission("r
     session.commit()
     return {"ok": True}
 
-
 # ============================ Stock-notify requests ============================
-
-@admin.get("/stock-notify")
-def stock_notify_list(_: None = _require_perm("products"), session: Session = Depends(get_session)):
-    rows = session.exec(select(StockNotifyRequest).order_by(StockNotifyRequest.created_at.desc())).all()  # type: ignore[arg-type]
-    out = []
-    for r in rows:
-        p = session.get(Product, r.product_id)
-        out.append({
-            "id": r.id, "product_id": r.product_id, "product_name": p.name if p else None,
-            "contact": r.contact, "notified_at": r.notified_at, "created_at": r.created_at,
-        })
-    return out
-
-
-# ============================ Campaigns ============================
-
-class CampaignIn(BaseModel):
-    name: str
-    slug: str
-    discount_type: DiscountType
-    discount_value: float = Field(gt=0)
-    max_discount_amount: float | None = None
-    description: str | None = None
-    banner_url: str | None = None
-    applies_to_all: bool = True
-    category_ids: list[str] = []
-    starts_at: datetime | None = None
-    ends_at: datetime | None = None
-    is_active: bool = True
-
-
-@admin.get("/campaigns")
-def list_campaigns(_: None = _require_perm("coupons"), session: Session = Depends(get_session)):
-    return session.exec(select(Campaign).order_by(Campaign.created_at.desc())).all()  # type: ignore[arg-type]
-
-
-@admin.post("/campaigns", status_code=201)
-def create_campaign(payload: CampaignIn, user: User = Depends(require_permission("coupons")), session: Session = Depends(get_session)):
-    if session.exec(select(Campaign).where(Campaign.slug == payload.slug)).first():
-        raise HTTPException(409, "slug کمپین تکراری است.")
-    data = payload.model_dump()
-    data["category_ids"] = json.dumps(payload.category_ids)
-    row = Campaign(**data)
-    session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="campaign", entity_id=row.id, metadata={"name": row.name})
-    session.commit()
-    session.refresh(row)
-    return row
-
-
-@admin.patch("/campaigns/{campaign_id}")
-def update_campaign(campaign_id: str, payload: dict, user: User = Depends(require_permission("coupons")), session: Session = Depends(get_session)):
-    row = session.get(Campaign, campaign_id)
-    if not row:
-        raise HTTPException(404, "کمپین یافت نشد.")
-    data = dict(payload)
-    if "category_ids" in data and isinstance(data["category_ids"], list):
-        data["category_ids"] = json.dumps(data["category_ids"])
-    # M4 fix: allowlist to prevent mass assignment of id/created_at etc.
-    allowed = {"name", "slug", "discount_type", "discount_value", "max_discount_amount", "description", "banner_url", "applies_to_all", "category_ids", "starts_at", "ends_at", "is_active"}
-    for key, value in data.items():
-        if key in allowed:
-            setattr(row, key, value)
-    log_activity(session, actor_id=user.id, action="update", entity_type="campaign", entity_id=row.id)
-    session.add(row)
-    session.commit()
-    return row
-
-
-@admin.delete("/campaigns/{campaign_id}")
-def delete_campaign(campaign_id: str, user: User = Depends(require_permission("coupons")), session: Session = Depends(get_session)):
-    row = session.get(Campaign, campaign_id)
-    if not row:
-        raise HTTPException(404, "کمپین یافت نشد.")
-    session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="campaign", entity_id=campaign_id)
-    session.commit()
-    return {"ok": True}
 
 
 # ============================ Shipping methods ============================
@@ -501,11 +338,9 @@ class ShippingIn(BaseModel):
     is_active: bool = True
     sort_order: int = 0
 
-
 @admin.get("/shipping-methods")
 def list_shipping(_: None = _require_perm("shipping"), session: Session = Depends(get_session)):
     return session.exec(select(ShippingMethod).order_by(ShippingMethod.sort_order)).all()
-
 
 @admin.post("/shipping-methods", status_code=201)
 def create_shipping(payload: ShippingIn, user: User = Depends(require_permission("shipping")), session: Session = Depends(get_session)):
@@ -513,11 +348,9 @@ def create_shipping(payload: ShippingIn, user: User = Depends(require_permission
         raise HTTPException(409, "کد روش ارسال تکراری است.")
     row = ShippingMethod(**payload.model_dump())
     session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="shipping_method", entity_id=row.id, metadata={"name": row.name})
     session.commit()
     session.refresh(row)
     return row
-
 
 @admin.patch("/shipping-methods/{method_id}")
 def update_shipping(method_id: str, payload: dict, user: User = Depends(require_permission("shipping")), session: Session = Depends(get_session)):
@@ -527,11 +360,9 @@ def update_shipping(method_id: str, payload: dict, user: User = Depends(require_
     for key in ("name", "code", "cost", "free_over_amount", "estimated_days_min", "estimated_days_max", "is_active", "sort_order"):
         if key in payload:
             setattr(row, key, payload[key])
-    log_activity(session, actor_id=user.id, action="update", entity_type="shipping_method", entity_id=row.id)
     session.add(row)
     session.commit()
     return row
-
 
 @admin.delete("/shipping-methods/{method_id}")
 def delete_shipping(method_id: str, user: User = Depends(require_permission("shipping")), session: Session = Depends(get_session)):
@@ -541,7 +372,6 @@ def delete_shipping(method_id: str, user: User = Depends(require_permission("shi
     session.delete(row)
     session.commit()
     return {"ok": True}
-
 
 # ============================ Returns (RMA) ============================
 
@@ -563,12 +393,10 @@ def list_returns(status: str | None = None, _: None = _require_perm("returns"), 
         })
     return out
 
-
 class ReturnUpdateIn(BaseModel):
     status: str | None = None
     admin_note: str | None = None
     refund_amount: float | None = None
-
 
 @admin.patch("/returns/{return_id}")
 def update_return(return_id: str, payload: ReturnUpdateIn, user: User = Depends(require_permission("returns")), session: Session = Depends(get_session)):
@@ -582,11 +410,9 @@ def update_return(return_id: str, payload: ReturnUpdateIn, user: User = Depends(
         setattr(row, key, value)
     if payload.status in {"received", "refunded", "rejected"} and not row.resolved_at:
         row.resolved_at = datetime.now(UTC)
-    log_activity(session, actor_id=user.id, action="update", entity_type="return_request", entity_id=row.id, metadata=data)
     session.add(row)
     session.commit()
     return row
-
 
 # ============================ Orders: detail & fulfilment ============================
 
@@ -611,7 +437,7 @@ def order_detail(order_id: str, _: None = _require_perm("orders"), session: Sess
         "email": order.email,
         "address": order.address, "city": order.city, "province": order.province, "postal_code": order.postal_code,
         "total_amount": float(order.total_amount), "shipping_cost": float(order.shipping_cost),
-        "discount_amount": float(order.discount_amount), "campaign_discount_amount": float(order.campaign_discount_amount),
+        "discount_amount": float(order.discount_amount),
         "coupon_code": order.coupon_code, "gift_wrap": order.gift_wrap, "gift_note": order.gift_note,
         "shipping_method_name": order.shipping_method_name,
         "tracking_code": order.tracking_code, "carrier": order.carrier,
@@ -638,13 +464,11 @@ def order_detail(order_id: str, _: None = _require_perm("orders"), session: Sess
         ],
     }
 
-
 class OrderFulfilIn(BaseModel):
     status: str | None = None
     tracking_code: str | None = Field(default=None, max_length=64)
     carrier: str | None = Field(default=None, max_length=64)
     admin_note: str | None = Field(default=None, max_length=1024)
-
 
 @admin.patch("/orders/{order_id}/fulfil")
 def fulfil_order(order_id: str, payload: OrderFulfilIn, user: User = Depends(require_permission("orders")), session: Session = Depends(get_session)):
@@ -670,12 +494,10 @@ def fulfil_order(order_id: str, payload: OrderFulfilIn, user: User = Depends(req
     if payload.admin_note is not None:
         order.admin_note = payload.admin_note
     session.add(order)
-    log_activity(session, actor_id=user.id, action="fulfil", entity_type="order", entity_id=order.id, metadata=data)
     session.commit()
     session.refresh(order)
     cache_delete_pattern("products:*")
     return {"ok": True, "status": order.status.value}
-
 
 # ============================ Users & roles ============================
 
@@ -707,7 +529,6 @@ def admin_users_list(
         ],
     }
 
-
 @admin.get("/roles")
 def list_roles(_: None = _require_perm("users"), session: Session = Depends(get_session)):
     return [
@@ -715,16 +536,13 @@ def list_roles(_: None = _require_perm("users"), session: Session = Depends(get_
         for r in session.exec(select(Role)).all()
     ]
 
-
 @admin.get("/permissions")
 def permission_catalog(_: None = _require_perm("users")):
     return {"permissions": PERMISSIONS, "presets": ROLE_PRESETS}
 
-
 class RoleIn(BaseModel):
     name: str
     permissions: list[str] = []
-
 
 @admin.post("/roles", status_code=201)
 def create_role(payload: RoleIn, user: User = Depends(require_permission("users")), session: Session = Depends(get_session)):
@@ -735,11 +553,9 @@ def create_role(payload: RoleIn, user: User = Depends(require_permission("users"
         raise HTTPException(400, f"دسترسی نامعتبر: {invalid}")
     row = Role(name=payload.name, permissions=",".join(payload.permissions))
     session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="role", entity_id=row.id, metadata={"name": row.name})
     session.commit()
     session.refresh(row)
     return {"id": row.id, "name": row.name, "permissions": payload.permissions}
-
 
 @admin.patch("/roles/{role_id}")
 def update_role(role_id: str, payload: RoleIn, user: User = Depends(require_permission("users")), session: Session = Depends(get_session)):
@@ -751,11 +567,9 @@ def update_role(role_id: str, payload: RoleIn, user: User = Depends(require_perm
         raise HTTPException(400, f"دسترسی نامعتبر: {invalid}")
     row.name = payload.name
     row.permissions = ",".join(payload.permissions)
-    log_activity(session, actor_id=user.id, action="update", entity_type="role", entity_id=row.id)
     session.add(row)
     session.commit()
     return {"id": row.id, "name": row.name, "permissions": payload.permissions}
-
 
 @admin.delete("/roles/{role_id}")
 def delete_role(role_id: str, user: User = Depends(require_permission("users")), session: Session = Depends(get_session)):
@@ -768,28 +582,11 @@ def delete_role(role_id: str, user: User = Depends(require_permission("users")),
     session.commit()
     return {"ok": True}
 
-
 # ============================ Notifications broadcast ============================
 
 class BroadcastIn(BaseModel):
     title: str = Field(max_length=255)
     body: str = Field(default="", max_length=2000)
-
-
-@admin.post("/notifications/broadcast")
-def broadcast(payload: BroadcastIn, user: User = Depends(require_permission("settings")), session: Session = Depends(get_session)):
-    users = session.exec(select(User).where(User.is_active == True)).all()  # noqa: E712
-    for u in users:
-        session.add(Notification(user_id=u.id, title=payload.title, body=payload.body))
-    log_activity(session, actor_id=user.id, action="broadcast", entity_type="notification", metadata={"title": payload.title})
-    session.commit()
-    return {"ok": True, "recipients": len(users)}
-
-
-@admin.get("/notifications")
-def all_notifications(_: None = _require_perm("settings"), session: Session = Depends(get_session), limit: int = Query(100, le=500)):
-    return session.exec(select(Notification).order_by(Notification.created_at.desc()).limit(limit)).all()  # type: ignore[arg-type]
-
 
 # ============================ Contact messages & newsletter ============================
 
@@ -797,11 +594,9 @@ def all_notifications(_: None = _require_perm("settings"), session: Session = De
 def contact_messages(_: None = _require_perm("messages"), session: Session = Depends(get_session)):
     return session.exec(select(ContactMessage).order_by(ContactMessage.created_at.desc())).all()  # type: ignore[arg-type]
 
-
 class MessageReplyIn(BaseModel):
     reply: str = Field(min_length=1, max_length=4000)
     mark_read: bool = True
-
 
 @admin.patch("/messages/{message_id}")
 def reply_message(message_id: str, payload: MessageReplyIn, user: User = Depends(require_permission("messages")), session: Session = Depends(get_session)):
@@ -816,7 +611,6 @@ def reply_message(message_id: str, payload: MessageReplyIn, user: User = Depends
     session.commit()
     return row
 
-
 @admin.patch("/messages/{message_id}/read")
 def mark_message_read(message_id: str, user: User = Depends(require_permission("messages")), session: Session = Depends(get_session)):
     row = session.get(ContactMessage, message_id)
@@ -827,7 +621,6 @@ def mark_message_read(message_id: str, user: User = Depends(require_permission("
     session.commit()
     return row
 
-
 @admin.delete("/messages/{message_id}")
 def delete_message(message_id: str, user: User = Depends(require_permission("messages")), session: Session = Depends(get_session)):
     row = session.get(ContactMessage, message_id)
@@ -836,7 +629,6 @@ def delete_message(message_id: str, user: User = Depends(require_permission("mes
     session.delete(row)
     session.commit()
     return {"ok": True}
-
 
 @admin.get("/coupon-redemptions")
 def coupon_redemptions(coupon_id: str | None = None, _: None = _require_perm("coupons"), session: Session = Depends(get_session)):
@@ -854,7 +646,6 @@ def coupon_redemptions(coupon_id: str | None = None, _: None = _require_perm("co
         for r in rows
     ]
 
-
 # ============================ Static pages & FAQ ============================
 
 class PageIn(BaseModel):
@@ -866,48 +657,6 @@ class PageIn(BaseModel):
     is_published: bool = False
     sort_order: int = 0
 
-
-@admin.get("/pages")
-def admin_pages(_: None = _require_perm("content"), session: Session = Depends(get_session)):
-    return session.exec(select(StaticPage).order_by(StaticPage.sort_order)).all()
-
-
-@admin.post("/pages", status_code=201)
-def create_page(payload: PageIn, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    if session.exec(select(StaticPage).where(StaticPage.slug == payload.slug)).first():
-        raise HTTPException(409, "slug صفحه تکراری است.")
-    row = StaticPage(**payload.model_dump())
-    session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="page", entity_id=row.id, metadata={"title": row.title})
-    session.commit()
-    session.refresh(row)
-    return row
-
-
-@admin.patch("/pages/{page_id}")
-def update_page(page_id: str, payload: dict, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    row = session.get(StaticPage, page_id)
-    if not row:
-        raise HTTPException(404, "صفحه یافت نشد.")
-    for key in ("title", "slug", "content", "meta_title", "meta_description", "is_published", "sort_order"):
-        if key in payload:
-            setattr(row, key, payload[key])
-    log_activity(session, actor_id=user.id, action="update", entity_type="page", entity_id=row.id)
-    session.add(row)
-    session.commit()
-    return row
-
-
-@admin.delete("/pages/{page_id}")
-def delete_page(page_id: str, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    row = session.get(StaticPage, page_id)
-    if not row:
-        raise HTTPException(404, "صفحه یافت نشد.")
-    session.delete(row)
-    session.commit()
-    return {"ok": True}
-
-
 class FAQIn(BaseModel):
     question: str = Field(max_length=512)
     answer: str
@@ -915,11 +664,9 @@ class FAQIn(BaseModel):
     sort_order: int = 0
     is_active: bool = True
 
-
 @admin.get("/faq")
 def admin_faq(_: None = _require_perm("content"), session: Session = Depends(get_session)):
     return session.exec(select(FAQItem).order_by(FAQItem.sort_order)).all()
-
 
 @admin.post("/faq", status_code=201)
 def create_faq(payload: FAQIn, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
@@ -928,7 +675,6 @@ def create_faq(payload: FAQIn, user: User = Depends(require_permission("content"
     session.commit()
     session.refresh(row)
     return row
-
 
 @admin.patch("/faq/{faq_id}")
 def update_faq(faq_id: str, payload: dict, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
@@ -942,7 +688,6 @@ def update_faq(faq_id: str, payload: dict, user: User = Depends(require_permissi
     session.commit()
     return row
 
-
 @admin.delete("/faq/{faq_id}")
 def delete_faq(faq_id: str, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
     row = session.get(FAQItem, faq_id)
@@ -953,179 +698,10 @@ def delete_faq(faq_id: str, user: User = Depends(require_permission("content")),
     return {"ok": True}
 
 
-# ============================ Settings & activity ============================
-
-@admin.get("/settings")
-def all_settings(_: None = _require_perm("settings"), session: Session = Depends(get_session)):
-    from app.models import Setting
-
-    rows = session.exec(select(Setting)).all()
-    return [
-        {"key": r.key, "value": r.value, "value_type": r.value_type}
-        for r in rows
-    ]
-
-
-@admin.get("/activity")
-def activity_log(
-    _: None = Depends(admin_user),
-    session: Session = Depends(get_session),
-    limit: int = Query(100, le=500),
-):
-    rows = session.exec(select(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(limit)).all()  # type: ignore[arg-type]
-    out = []
-    for r in rows:
-        actor = session.get(User, r.actor_id) if r.actor_id else None
-        try:
-            meta = json.loads(r.metadata_json or "{}")
-        except Exception:
-            meta = {}
-        out.append({
-            "id": r.id, "action": r.action, "entity_type": r.entity_type, "entity_id": r.entity_id,
-            "actor_name": actor.full_name or (actor.email if actor else "سیستم"),
-            "metadata": meta, "created_at": r.created_at,
-        })
-    return out
-
-
-# ============================ Homepage sections ============================
-
-SECTION_KINDS = {k.value for k in HomepageSectionKind}
-PRODUCT_SOURCES = {s.value for s in ProductSource}
-
-
-class HomepageSectionIn(BaseModel):
-    kind: str
-    title: str = Field(default="", max_length=255)
-    subtitle: str | None = Field(default=None, max_length=512)
-    is_enabled: bool = True
-    sort_order: int = 0
-    limit_count: int = Field(default=8, ge=1, le=24)
-    source: str | None = None
-    category_id: str | None = None
-    product_ids: list[str] = []
-
-
-def _section_out(session: Session, s: HomepageSection) -> dict:
-    category_name = None
-    if s.category_id:
-        from app.models import Category
-        cat = session.get(Category, s.category_id)
-        category_name = cat.name if cat else None
-    product_count = len(s.manual_ids())
-    return {
-        "id": s.id, "kind": s.kind.value, "title": s.title, "subtitle": s.subtitle,
-        "is_enabled": s.is_enabled, "sort_order": s.sort_order, "limit_count": s.limit_count,
-        "source": s.source.value if s.source else None,
-        "category_id": s.category_id, "category_name": category_name,
-        "product_ids": s.manual_ids(), "manual_product_count": product_count,
-    }
-
-
-@admin.get("/homepage-sections")
-def list_homepage_sections(_: None = _require_perm("content"), session: Session = Depends(get_session)):
-    rows = session.exec(select(HomepageSection).order_by(HomepageSection.sort_order)).all()  # type: ignore[arg-type]
-    return [_section_out(session, s) for s in rows]
-
-
-@admin.post("/homepage-sections", status_code=201)
-def create_homepage_section(payload: HomepageSectionIn, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    if payload.kind not in SECTION_KINDS:
-        raise HTTPException(400, "نوع بخش نامعتبر است.")
-    if payload.source and payload.source not in PRODUCT_SOURCES:
-        raise HTTPException(400, "منبع محصولات نامعتبر است.")
-    if payload.kind == "products" and not payload.source:
-        raise HTTPException(400, "برای بخش محصولات، منبع را انتخاب کنید.")
-    row = HomepageSection(
-        kind=HomepageSectionKind(payload.kind),
-        title=payload.title, subtitle=payload.subtitle,
-        is_enabled=payload.is_enabled, sort_order=payload.sort_order, limit_count=payload.limit_count,
-        source=ProductSource(payload.source) if payload.source else None,
-        category_id=payload.category_id,
-        product_ids=json.dumps(payload.product_ids),
-    )
-    session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="homepage_section", entity_id=row.id, metadata={"title": row.title})
-    session.commit()
-    invalidate_home()
-    session.refresh(row)
-    return _section_out(session, row)
-
-
-@admin.patch("/homepage-sections/{section_id}")
-def update_homepage_section(section_id: str, payload: dict, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    row = session.get(HomepageSection, section_id)
-    if not row:
-        raise HTTPException(404, "بخش یافت نشد.")
-    if "kind" in payload and payload["kind"] not in SECTION_KINDS:
-        raise HTTPException(400, "نوع بخش نامعتبر است.")
-    if "source" in payload and payload["source"] and payload["source"] not in PRODUCT_SOURCES:
-        raise HTTPException(400, "منبع محصولات نامعتبر است.")
-    simple = {"title", "subtitle", "is_enabled", "sort_order", "limit_count", "category_id"}
-    for key, value in payload.items():
-        if key in simple:
-            setattr(row, key, value)
-        elif key == "kind" and value:
-            row.kind = HomepageSectionKind(value)
-        elif key == "source":
-            row.source = ProductSource(value) if value else None
-        elif key == "product_ids" and isinstance(value, list):
-            row.product_ids = json.dumps(value)
-    log_activity(session, actor_id=user.id, action="update", entity_type="homepage_section", entity_id=row.id)
-    session.add(row)
-    session.commit()
-    invalidate_home()
-    session.refresh(row)
-    return _section_out(session, row)
-
-
-@admin.delete("/homepage-sections/{section_id}")
-def delete_homepage_section(section_id: str, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    row = session.get(HomepageSection, section_id)
-    if not row:
-        raise HTTPException(404, "بخش یافت نشد.")
-    session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="homepage_section", entity_id=section_id)
-    session.commit()
-    invalidate_home()
-    return {"ok": True}
-
-
-@admin.post("/homepage-sections/reorder")
-def reorder_homepage_sections(payload: dict, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    """payload: {"order": [section_id, ...]} — positions follow the list order."""
-    order: list[str] = payload.get("order", [])
-    if not order:
-        raise HTTPException(400, "ترتیب ارسال نشده است.")
-    for index, section_id in enumerate(order):
-        row = session.get(HomepageSection, section_id)
-        if row:
-            row.sort_order = index * 10
-            session.add(row)
-    log_activity(session, actor_id=user.id, action="reorder", entity_type="homepage_section", metadata={"count": len(order)})
-    session.commit()
-    invalidate_home()
-    return {"ok": True}
-
-
-@admin.post("/homepage-sections/reset", status_code=201)
-def reset_homepage_sections(user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    """Restore the default section layout (keeps nothing — full reset)."""
-    for row in session.exec(select(HomepageSection)).all():
-        session.delete(row)
-    for section in default_sections():
-        session.add(section)
-    log_activity(session, actor_id=user.id, action="reset", entity_type="homepage_section")
-    session.commit()
-    invalidate_home()
-    rows = session.exec(select(HomepageSection).order_by(HomepageSection.sort_order)).all()  # type: ignore[arg-type]
-    return [_section_out(session, s) for s in rows]
-
 
 # ============================ Generic media upload ============================
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
-
 
 @admin.post("/media/upload", status_code=201)
 async def upload_media(file: UploadFile = File(...), user: User = Depends(admin_user), session: Session = Depends(get_session)):
@@ -1142,10 +718,8 @@ async def upload_media(file: UploadFile = File(...), user: User = Depends(admin_
     extension = ALLOWED_IMAGE_TYPES[content_type]
     object_name = f"uploads/{datetime.now(UTC):%Y/%m}/{secrets.token_hex(12)}.{extension}"
     url = put_image(object_name, data, content_type)
-    log_activity(session, actor_id=user.id, action="upload", entity_type="media", metadata={"object": object_name})
     session.commit()
     return {"url": url, "object_name": object_name}
-
 
 @admin.post("/avatar/upload", status_code=201)
 async def upload_avatar(file: UploadFile = File(...), user: User = Depends(admin_user), session: Session = Depends(get_session)):
@@ -1164,9 +738,7 @@ async def upload_avatar(file: UploadFile = File(...), user: User = Depends(admin
     user.avatar_url = url
     session.add(user)
     session.commit()
-    log_activity(session, actor_id=user.id, action="upload", entity_type="media", metadata={"object": object_name})
     return {"url": url, "object_name": object_name}
-
 
 # ============================ Settings (grouped) ============================
 
@@ -1192,36 +764,6 @@ SETTING_GROUPS = [
     {"key": "store", "label": "فروشگاه"},
 ]
 
-
-@admin.get("/settings/definitions")
-def settings_definitions(_: None = _require_perm("settings")):
-    return {"groups": SETTING_GROUPS, "definitions": SETTING_DEFINITIONS}
-
-
-@admin.put("/settings/bulk")
-def settings_bulk(payload: dict, user: User = Depends(require_permission("settings")), session: Session = Depends(get_session)):
-    """payload: {"store_phone": "021…", "tax_rate_percent": "9"} — upsert many at once."""
-    values: dict = payload.get("values", payload)
-    known = {d["key"] for d in SETTING_DEFINITIONS}
-    updated = 0
-    for key, value in values.items():
-        if key not in known:
-            continue
-        row = session.exec(select(Setting).where(Setting.key == key)).first()
-        definition = next(d for d in SETTING_DEFINITIONS if d["key"] == key)
-        if row:
-            row.value = str(value if value is not None else "")
-            session.add(row)
-        else:
-            session.add(Setting(key=key, value=str(value if value is not None else ""), value_type=definition["type"]))
-        updated += 1
-    log_activity(session, actor_id=user.id, action="update", entity_type="settings", metadata={"keys": list(values.keys())[:20]})
-    session.commit()
-    from app.services.cache import cache_delete_pattern as _cdp
-    _cdp("settings:*")
-    return {"ok": True, "updated": updated}
-
-
 # ============================ Product images (list for editor) ============================
 
 @admin.get("/products/{product_id}/images")
@@ -1233,7 +775,6 @@ def admin_product_images(product_id: str, _: None = _require_perm("products"), s
         {"id": i.id, "url": i.url, "alt_text": i.alt_text, "sort_order": i.sort_order, "is_primary": i.is_primary}
         for i in rows
     ]
-
 
 # ============================ Admin list v2: products & orders ============================
 
@@ -1274,7 +815,6 @@ def admin_products_v2(
         select(Product).where(*filters).order_by(Product.created_at.desc()).offset(offset).limit(limit)  # type: ignore[arg-type]
     ).all()
     categories = {c.id: c.name for c in session.exec(select(Category)).all()} if rows else {}
-    brands = {b.id: b.name for b in session.exec(select(Brand)).all()} if rows else {}
     items = []
     for p in rows:
         img = p.primary_image
@@ -1282,11 +822,10 @@ def admin_products_v2(
             "id": p.id, "name": p.name, "slug": p.slug, "sku": p.sku,
             "price": float(p.price), "compare_at_price": float(p.compare_at_price) if p.compare_at_price else None,
             "stock_qty": p.stock_qty, "is_active": p.is_active,
-            "category_name": categories.get(p.category_id), "brand_name": brands.get(p.brand_id),
+            "category_name": categories.get(p.category_id),
             "image_url": img.url if img else None, "created_at": p.created_at,
         })
     return {"total": total, "items": items}
-
 
 @admin.get("/orders-v2")
 def admin_orders_v2(
@@ -1329,9 +868,7 @@ def admin_orders_v2(
     ]
     return {"total": total, "items": items}
 
-
 # ============================ Attributes & Product Specs ============================
-
 
 class AttributeIn(BaseModel):
     name: str = Field(max_length=64)
@@ -1341,7 +878,6 @@ class AttributeIn(BaseModel):
     is_filterable: bool = False
     sort_order: int = 0
 
-
 class AttributeValueIn(BaseModel):
     attribute_id: str
     value: str = Field(max_length=128)
@@ -1349,13 +885,11 @@ class AttributeValueIn(BaseModel):
     swatch_image_url: str | None = None
     sort_order: int = 0
 
-
 class ProductSpecIn(BaseModel):
     attribute_id: str
     attribute_value_id: str
     custom_value: str | None = None
     sort_order: int = 0
-
 
 @admin.get("/attributes")
 def list_attributes(_: None = _require_perm("products"), session: Session = Depends(get_session)):
@@ -1372,7 +906,6 @@ def list_attributes(_: None = _require_perm("products"), session: Session = Depe
         })
     return result
 
-
 @admin.post("/attributes", status_code=201)
 def create_attribute(payload: AttributeIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
     existing = session.exec(select(Attribute).where(Attribute.slug == payload.slug)).first()  # type: ignore[arg-type]
@@ -1380,11 +913,9 @@ def create_attribute(payload: AttributeIn, user: User = Depends(require_permissi
         raise HTTPException(400, "Slug تکراری است.")
     row = Attribute(**payload.model_dump())
     session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="attribute", entity_id=row.id, metadata={"name": row.name})
     session.commit()
     session.refresh(row)
     return {"id": row.id, "name": row.name, "slug": row.slug}
-
 
 @admin.patch("/attributes/{attribute_id}")
 def update_attribute(attribute_id: str, payload: AttributeIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -1394,10 +925,8 @@ def update_attribute(attribute_id: str, payload: AttributeIn, user: User = Depen
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(row, k, v)
     session.add(row)
-    log_activity(session, actor_id=user.id, action="update", entity_type="attribute", entity_id=row.id)
     session.commit()
     return {"ok": True}
-
 
 @admin.delete("/attributes/{attribute_id}")
 def delete_attribute(attribute_id: str, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -1405,10 +934,8 @@ def delete_attribute(attribute_id: str, user: User = Depends(require_permission(
     if not row:
         raise HTTPException(404, "ویژگی یافت نشد.")
     session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="attribute", entity_id=attribute_id)
     session.commit()
     return {"ok": True}
-
 
 @admin.post("/attribute-values", status_code=201)
 def create_attribute_value(payload: AttributeValueIn, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -1420,11 +947,9 @@ def create_attribute_value(payload: AttributeValueIn, user: User = Depends(requi
         raise HTTPException(400, "Slug تکراری است.")
     row = AttributeValue(**payload.model_dump())
     session.add(row)
-    log_activity(session, actor_id=user.id, action="create", entity_type="attribute_value", entity_id=row.id)
     session.commit()
     session.refresh(row)
     return {"id": row.id, "value": row.value, "slug": row.slug}
-
 
 @admin.delete("/attribute-values/{value_id}")
 def delete_attribute_value(value_id: str, user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
@@ -1432,10 +957,8 @@ def delete_attribute_value(value_id: str, user: User = Depends(require_permissio
     if not row:
         raise HTTPException(404, "مقدار ویژگی یافت نشد.")
     session.delete(row)
-    log_activity(session, actor_id=user.id, action="delete", entity_type="attribute_value", entity_id=value_id)
     session.commit()
     return {"ok": True}
-
 
 @admin.get("/products/{product_id}/specs")
 def list_product_specs(product_id: str, _: None = _require_perm("products"), session: Session = Depends(get_session)):
@@ -1458,7 +981,6 @@ def list_product_specs(product_id: str, _: None = _require_perm("products"), ses
         })
     return result
 
-
 @admin.put("/products/{product_id}/specs")
 def set_product_specs(product_id: str, specs: list[ProductSpecIn], user: User = Depends(require_permission("products")), session: Session = Depends(get_session)):
     from app.models import ProductAttributeValue
@@ -1475,50 +997,11 @@ def set_product_specs(product_id: str, specs: list[ProductSpecIn], user: User = 
             custom_value=spec.custom_value,
             sort_order=spec.sort_order or idx * 10,
         ))
-    log_activity(session, actor_id=user.id, action="update", entity_type="product_specs", entity_id=product_id, metadata={"count": len(specs)})
     session.commit()
     cache_delete_pattern(f"products:*")
     return {"ok": True, "count": len(specs)}
 
-
-# ============================ Newsletter admin ============================
-
-
-@admin.get("/newsletter")
-def list_newsletter_subscribers(
-    _: None = _require_perm("content"),
-    session: Session = Depends(get_session),
-    offset: int = 0,
-    limit: int = Query(50, le=200),
-):
-    from app.models import NewsletterSubscription
-    total = int(session.exec(select(func.count(NewsletterSubscription.id))).one() or 0)  # type: ignore[arg-type]
-    rows = session.exec(
-        select(NewsletterSubscription).order_by(NewsletterSubscription.created_at.desc()).offset(offset).limit(limit)  # type: ignore[arg-type]
-    ).all()
-    return {
-        "total": total,
-        "items": [
-            {"id": r.id, "email": r.email, "consent": r.consent, "unsubscribed_at": r.unsubscribed_at, "created_at": r.created_at}
-            for r in rows
-        ],
-    }
-
-
-@admin.delete("/newsletter/{email}")
-def admin_unsubscribe(email: str, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    from app.models import NewsletterSubscription
-    row = session.exec(select(NewsletterSubscription).where(NewsletterSubscription.email == email)).first()
-    if row:
-        row.unsubscribed_at = datetime.now(UTC)
-        row.consent = False
-        session.add(row)
-        session.commit()
-    return {"ok": True}
-
-
 # ============================ Loyalty Program ============================
-
 
 @admin.get("/loyalty/{user_id}")
 def get_user_loyalty(user_id: str, _: None = _require_perm("users"), session: Session = Depends(get_session)):
@@ -1533,7 +1016,6 @@ def get_user_loyalty(user_id: str, _: None = _require_perm("users"), session: Se
             break
     return {"user_id": user_id, "points": total_points, "tier": tier}
 
-
 LOYALTY_TIER_THRESHOLDS = {
     "bronze": 0,
     "silver": 100000,
@@ -1541,9 +1023,7 @@ LOYALTY_TIER_THRESHOLDS = {
     "platinum": 2000000,
 }
 
-
 # ============================ Navigation CMS ============================
-
 
 class NavigationItemIn(BaseModel):
     label: str = Field(max_length=128)
@@ -1552,35 +1032,3 @@ class NavigationItemIn(BaseModel):
     is_active: bool = True
     open_in_new_tab: bool = False
 
-
-class NavigationMenuIn(BaseModel):
-    location: str = Field(max_length=32)  # header, footer_main, footer_help, social
-    items: list[NavigationItemIn] = []
-
-
-@admin.get("/navigation/{location}")
-def get_navigation(location: str, _: None = _require_perm("content"), session: Session = Depends(get_session)):
-    row = session.exec(select(Setting).where(Setting.key == f"nav_{location}")).first()  # type: ignore[arg-type]
-    if not row:
-        return {"location": location, "items": []}
-    try:
-        items = json.loads(row.value)
-    except Exception:
-        items = []
-    return {"location": location, "items": items}
-
-
-@admin.put("/navigation/{location}")
-def set_navigation(location: str, payload: NavigationMenuIn, user: User = Depends(require_permission("content")), session: Session = Depends(get_session)):
-    key = f"nav_{location}"
-    items = [item.model_dump() for item in payload.items]
-    row = session.exec(select(Setting).where(Setting.key == key)).first()  # type: ignore[arg-type]
-    if row:
-        row.value = json.dumps(items, ensure_ascii=False)
-    else:
-        row = Setting(key=key, value=json.dumps(items, ensure_ascii=False), value_type="json")
-    session.add(row)
-    log_activity(session, actor_id=user.id, action="update", entity_type="navigation", metadata={"location": location})
-    session.commit()
-    cache_delete_pattern("settings:*")
-    return {"ok": True, "count": len(items)}

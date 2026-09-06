@@ -4,7 +4,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.db.session import get_session
-from app.models import Brand, Category, Product, ProductImage, ProductVariant
+from app.models import Category, Product, ProductImage, ProductVariant
 from app.schemas.store import (
     CategoryDetail,
     CategoryNode,
@@ -77,7 +77,16 @@ def _detail(p: Product, variants: list[ProductVariant] | None = None) -> dict:
 @router.get("/categories", response_model=list[CategoryNode])
 async def list_categories(session: Session = Depends(get_session)) -> list[CategoryNode]:
     cats = session.exec(select(Category).order_by(Category.name)).all()  # type: ignore[arg-type]
-    nodes = {c.id: CategoryNode.model_validate(c) for c in cats}
+    counts = dict(
+        session.exec(
+            select(Product.category_id, func.count()).group_by(Product.category_id)  # type: ignore[arg-type]
+        ).all()
+    )
+    nodes = {}
+    for c in cats:
+        node = CategoryNode.model_validate(c)
+        node.product_count = int(counts.get(c.id, 0))
+        nodes[c.id] = node
     roots: list[CategoryNode] = []
     for c in cats:
         node = nodes[c.id]
@@ -160,11 +169,6 @@ async def list_products(
             cache_set_json(cat_cache_key, category_ids, ttl_seconds=300)
 
     filters = [Product.is_active == True]  # noqa: E712
-    if brand:
-        brand_row = session.exec(select(Brand).where(Brand.slug == brand)).first()  # type: ignore[arg-type]
-        if not brand_row:
-            return ProductPage(items=[], total=0, page=page, page_size=page_size, pages=0)
-        filters.append(Product.brand_id == brand_row.id)
     if category_ids is not None:
         if not category_ids:
             return ProductPage(items=[], total=0, page=page, page_size=page_size, pages=0)
@@ -213,13 +217,6 @@ async def product_detail(slug: str, session: Session = Depends(get_session)) -> 
         select(ProductVariant).where(ProductVariant.product_id == p.id, ProductVariant.is_active == True).order_by(ProductVariant.sort_order)  # type: ignore[arg-type]
     ).all()
     return ProductDetail(**_detail(p, variants))
-
-
-@router.get("/brands", response_model=list[dict])
-async def list_brands_public(session: Session = Depends(get_session)) -> list[dict]:
-    """Public active brands for storefront filters (no auth required)."""
-    rows = session.exec(select(Brand).where(Brand.is_active == True).order_by(Brand.name)).all()  # type: ignore[arg-type]
-    return [{"id": b.id, "name": b.name, "slug": b.slug, "logo_url": b.logo_url} for b in rows]
 
 
 # keep images listing reachable (used by admin preview tooling)

@@ -172,3 +172,33 @@
     scroll-snap-align: start;
   }
 }
+
+/* ---------- Article body typography (CMS rich text) ---------- */
+.article-body {
+  @apply max-w-3xl text-[15px] leading-9 text-char-soft dark:text-white/65 md:text-base md:leading-10;
+}
+.article-body h1,
+.article-body h2,
+.article-body h3,
+.article-body h4 {
+  @apply mt-10 mb-4 font-extrabold text-char dark:text-white;
+}
+.article-body h1 { @apply text-2xl md:text-3xl; }
+.article-body h2 { @apply text-xl md:text-2xl; }
+.article-body h3 { @apply text-lg md:text-xl; }
+.article-body p { @apply mb-5; }
+.article-body a { @apply font-bold text-lajvard underline decoration-lajvard/30 underline-offset-4 transition-colors hover:decoration-lajvard dark:text-lajvard-soft; }
+.article-body strong { @apply font-extrabold text-char dark:text-white; }
+.article-body ul { @apply mb-5 list-disc space-y-2 pr-6; }
+.article-body ol { @apply mb-5 list-decimal space-y-2 pr-6; }
+.article-body li::marker { @apply text-kiln-clay dark:text-clay-soft; }
+.article-body blockquote { @apply my-6 border-r-4 border-kiln-clay/50 bg-kiln-clay/5 px-5 py-4 text-char dark:border-clay-soft/40 dark:bg-clay-soft/5 dark:text-white/80; }
+.article-body img { @apply my-6 w-full rounded-2xl; }
+.article-body figure img { @apply my-0; }
+.article-body figcaption { @apply mt-2 text-center text-xs text-char-soft dark:text-white/40; }
+.article-body code { @apply rounded-md bg-char/10 px-1.5 py-0.5 text-sm dark:bg-white/10; }
+.article-body pre { @apply my-6 overflow-x-auto rounded-2xl bg-char/10 p-4 text-sm leading-7 dark:bg-white/10; }
+.article-body hr { @apply my-8 border-char/10 dark:border-white/10; }
+.article-body table { @apply my-6 w-full text-sm; }
+.article-body th { @apply border-b border-char/20 px-3 py-2 text-right font-bold dark:border-white/20; }
+.article-body td { @apply border-b border-char/10 px-3 py-2 dark:border-white/10; }

@@ -21,7 +21,6 @@ from app.models import (
     ProductQuestion,
     ProductReview,
     ReviewFeedback,
-    StaticPage,
     StockNotifyRequest,
     User,
 )
@@ -38,6 +37,37 @@ class ReviewIn(BaseModel):
     rating: int = Field(ge=1, le=5)
     title: str = Field(default="", max_length=255)
     body: str = Field(min_length=3, max_length=4000)
+
+
+@public.get("/reviews/latest")
+def latest_reviews(limit: int = Query(6, le=12), s: Session = Depends(get_session)):
+    """Latest approved reviews for the homepage social-proof section."""
+    rows = s.exec(
+        select(ProductReview)
+        .where(ProductReview.is_approved == True)  # noqa: E712
+        .order_by(ProductReview.created_at.desc())  # type: ignore[arg-type]
+        .limit(limit)
+    ).all()
+    product_ids = [r.product_id for r in rows if r.product_id]
+    products = (
+        {p.id: p for p in s.exec(select(Product).where(Product.id.in_(product_ids))).all()}
+        if product_ids
+        else {}
+    )
+    return [
+        {
+            "id": r.id,
+            "author_name": r.author_name,
+            "rating": r.rating,
+            "title": r.title,
+            "body": r.body,
+            "is_buyer": r.is_buyer,
+            "created_at": r.created_at,
+            "product_name": products[r.product_id].name if r.product_id in products else None,
+            "product_slug": products[r.product_id].slug if r.product_id in products else None,
+        }
+        for r in rows
+    ]
 
 
 @public.get("/products/{product_id}/reviews")
@@ -221,25 +251,6 @@ def stock_notify(payload: StockNotifyIn, session: Session = Depends(get_session)
 
 
 # ---------- CMS: pages & FAQ ----------
-
-@public.get("/pages/{slug}")
-def get_page(slug: str, session: Session = Depends(get_session)):
-    page = session.exec(
-        select(StaticPage).where(StaticPage.slug == slug, StaticPage.is_published == True)  # noqa: E712
-    ).first()
-    if not page:
-        raise HTTPException(404, "صفحه یافت نشد.")
-    return page
-
-
-@public.get("/pages")
-def list_pages(session: Session = Depends(get_session)):
-    return session.exec(
-        select(StaticPage)
-        .where(StaticPage.is_published == True)  # noqa: E712
-        .order_by(StaticPage.sort_order)  # type: ignore[arg-type]
-    ).all()
-
 
 @public.get("/faq")
 def faq_list(category: str | None = None, session: Session = Depends(get_session)):

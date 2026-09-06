@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiJson, authHeaders } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast-provider";
+import { MediaUploader } from "@/components/admin/MediaUploader";
 import { cn } from "@/lib/utils";
 
 interface Variant {
@@ -36,6 +37,7 @@ export function ProductVariantManager({
     price_delta: 0,
     stock_qty: 0,
     is_active: true,
+    image_url: "" as string | null,
   });
   const { toast } = useToast();
 
@@ -68,6 +70,7 @@ export function ProductVariantManager({
           body: JSON.stringify({
             name: newVariant.name,
             sku: newVariant.sku,
+            image_url: newVariant.image_url || null,
             price_delta: newVariant.price_delta,
             stock_qty: newVariant.stock_qty,
             is_active: newVariant.is_active,
@@ -81,6 +84,7 @@ export function ProductVariantManager({
         price_delta: 0,
         stock_qty: 0,
         is_active: true,
+        image_url: null,
       });
       toast("وارینت افزوده شد.", "success");
       onVariantAdd?.(data);
@@ -207,6 +211,9 @@ export function ProductVariantManager({
               onChange={(e) => setNewVariant({ ...newVariant, stock_qty: Number(e.target.value) })}
               className="w-full min-h-[44px] rounded-xl border border-char/20 bg-surface px-3 py-2.5 text-sm outline-none focus:border-lajvard dark:border-white/20 dark:bg-black/25"
             />
+          </div>
+          <div className="sm:col-span-2">
+            <MediaUploader value={newVariant.image_url} onChange={(url) => setNewVariant({ ...newVariant, image_url: url })} label="تصویر وارینت" aspect="wide" />
           </div>
           <button
             type="button"

@@ -9,7 +9,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 
 export const metadata: Metadata = {
   title: "راهنمای طراحی",
-  description: "کتابخانهٔ اجزای رابط کاربری تن‌سِرام",
+  description: "کتابخانهٔ اجزای رابط کاربری آنیمور سرام",
   robots: { index: false },
 };
 
@@ -26,7 +26,7 @@ export default function StyleGuidePage() {
   return (
     <div className="mx-auto max-w-5xl space-y-16 px-4 py-14">
       <header>
-        <h1 className="text-3xl font-extrabold md:text-4xl">راهنمای سبک تن‌سِرام</h1>
+        <h1 className="text-3xl font-extrabold md:text-4xl">راهنمای سبک آنیمور سرام</h1>
         <p className="mt-3 max-w-xl leading-8 text-char-soft dark:text-ink-soft">
           امضای بصری فروشگاه: «لبهٔ لعاب» — هر عنصر تعامدی لبهٔ نامنظم چرخ‌کاری
           دارد و در حالت هاور، جلوهٔ لعابِ خیس روی لبه می‌نشیند.

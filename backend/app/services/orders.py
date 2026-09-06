@@ -9,7 +9,6 @@ from app.compat import UTC
 from sqlmodel import Session, select
 
 from app.models import (
-    Campaign,
     Coupon,
     CouponRedemption,
     Order,
@@ -53,33 +52,6 @@ class OrderError(Exception):
         super().__init__(message_fa)
 
 
-def active_campaign_for(session: Session, category_ids: list[str], subtotal: float) -> Campaign | None:
-    """Best running campaign covering the cart's categories (deepest discount wins) — uses actual subtotal."""
-    import json as _json
-
-    now = datetime.now(UTC)
-    campaigns = session.exec(
-        select(Campaign).where(
-            Campaign.is_active == True,  # noqa: E712
-            (Campaign.starts_at == None) | (Campaign.starts_at <= now),  # noqa: E711
-            (Campaign.ends_at == None) | (Campaign.ends_at >= now),  # noqa: E711
-        )
-    ).all()
-    best: Campaign | None = None
-    best_amount = 0.0
-    for campaign in campaigns:
-        if not campaign.applies_to_all:
-            try:
-                covered = set(_json.loads(campaign.category_ids or "[]"))
-            except Exception:
-                covered = set()
-            if not covered.intersection(category_ids):
-                continue
-        amount = campaign.compute_discount(subtotal)
-        if amount > best_amount:
-            best, best_amount = campaign, amount
-    return best
-
 
 def shipping_cost_for(session: Session, method: ShippingMethod | None, subtotal: float) -> float:
     if method is None:
@@ -94,20 +66,16 @@ def compute_totals(
     coupon: Coupon | None,
     gift_wrap: bool,
     shipping_cost: float = 0,
-    campaign: Campaign | None = None,
     tax_rate: float = 0,
     gift_wrap_fee: float = DEFAULT_GIFT_WRAP_FEE,
 ) -> dict:
     discount = coupon.compute_discount(subtotal) if coupon else 0
-    campaign_discount = 0
-    if campaign:
-        campaign_discount = campaign.compute_discount(max(subtotal - discount, 0))
     gift_fee = gift_wrap_fee if gift_wrap else 0
-    taxable = max(subtotal - discount - campaign_discount, 0)
+    taxable = max(subtotal - discount, 0)
     tax_amount = round(taxable * tax_rate) if tax_rate else 0
     return {
         "discount_amount": round(discount),
-        "campaign_discount_amount": round(campaign_discount),
+        "campaign_discount_amount": 0,
         "gift_wrap_fee": gift_fee,
         "tax_amount": tax_amount,
         "tax_rate": tax_rate,
@@ -233,8 +201,6 @@ def create_order(
         if not valid:
             raise OrderError(msg, 400)
 
-    campaign = active_campaign_for(session, category_ids, subtotal)
-
     shipping_method: ShippingMethod | None = None
     if customer.get("shipping_method_id"):
         shipping_method = session.get(ShippingMethod, customer["shipping_method_id"])
@@ -256,7 +222,7 @@ def create_order(
             gift_wrap_fee = float(_gift_row.value)
     except Exception:
         tax_rate = 0.0
-    totals = compute_totals(subtotal, coupon, bool(customer.get("gift_wrap")), shipping_cost, campaign, tax_rate, gift_wrap_fee)
+    totals = compute_totals(subtotal, coupon, bool(customer.get("gift_wrap")), shipping_cost, tax_rate, gift_wrap_fee)
 
     order = Order(
         order_number=generate_order_number(),
@@ -272,8 +238,7 @@ def create_order(
         discount_amount=totals["discount_amount"],
         tax_rate=totals["tax_rate"],
         tax_amount=totals["tax_amount"],
-        campaign_discount_amount=totals["campaign_discount_amount"],
-        campaign_id=campaign.id if campaign else None,
+        campaign_discount_amount=0,
         coupon_code=coupon.code if coupon else None,
         gift_wrap=bool(customer.get("gift_wrap")),
         gift_note=customer.get("gift_note"),

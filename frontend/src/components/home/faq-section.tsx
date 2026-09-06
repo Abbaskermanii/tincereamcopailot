@@ -45,18 +45,18 @@ export function FaqSection({ title, subtitle, faq_items, limit = 6 }: FaqSection
           </Link>
         }
       />
-      <div className="mx-auto max-w-2xl">
-        <Accordion type="single" collapsible className="space-y-2">
+      <div className="mx-auto max-w-4xl">
+        <Accordion type="single" collapsible className="space-y-3">
           {items.map((item) => (
             <AccordionItem
               key={item.id}
               value={item.id}
-              className="rounded-xl border border-char/5 bg-surface px-5 transition-colors hover:border-char/10 dark:border-white/5 dark:bg-[#262320] dark:hover:border-white/10"
+              className="rounded-wobble-card border border-char/5 bg-surface px-6 transition-colors hover:border-char/10 dark:border-white/5 dark:bg-[#262320] dark:hover:border-white/10"
             >
-              <AccordionTrigger className="py-4 text-right text-sm font-bold hover:no-underline hover:text-kiln-clay dark:hover:text-clay-soft md:text-base">
+              <AccordionTrigger className="py-5 text-right text-sm font-bold hover:no-underline hover:text-kiln-clay dark:hover:text-clay-soft md:text-lg md:leading-8">
                 {item.question}
               </AccordionTrigger>
-              <AccordionContent className="pb-4 text-sm leading-7 text-char-soft dark:text-white/55">
+              <AccordionContent className="pb-5 text-sm leading-8 text-char-soft dark:text-white/55 md:text-base">
                 {item.answer}
               </AccordionContent>
             </AccordionItem>

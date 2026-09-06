@@ -133,7 +133,7 @@ function AuthInner() {
   return (
     <div className="mx-auto max-w-md px-4 py-14 md:py-20">
       <div className="rounded-wobble bg-surface p-6 shadow-lifted md:p-8">
-        <p className="text-sm text-ink-soft">حساب تن‌سِرام</p>
+        <p className="text-sm text-ink-soft">حساب آنیمور سرام</p>
         <h1 className="mt-2 text-3xl font-extrabold">
           {mode === "login" ? "خوش آمدید" : mode === "register" ? "ساخت حساب" : mode === "otp" ? "ورود با موبایل" : mode === "reset_request" ? "فراموشی رمز عبور" : "تنظیم رمز جدید"}
         </h1>

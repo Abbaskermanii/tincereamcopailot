@@ -25,6 +25,10 @@ const config: Config = {
       },
       borderRadius: {
         wobble: "255px 18px 225px 18px / 18px 225px 18px 255px",
+        /** Admin-dashboard style wave, toned down for storefront cards */
+        "wobble-card": "60px 20px 52px 20px / 20px 52px 20px 60px",
+        /** Subtle handmade wave — same shape on every card size */
+        "wobble-soft": "22px 27px 22px 27px / 27px 22px 27px 22px",
       },
       boxShadow: {
         xs: "var(--shadow-xs)",
