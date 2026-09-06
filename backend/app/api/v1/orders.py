@@ -130,6 +130,7 @@ async def order_status(
         tracking_code=order.tracking_code,
         carrier=order.carrier,
         shipping_method_name=order.shipping_method_name,
+        admin_note=order.admin_note,
         items=[
             OrderItemOut(
                 product_id=i.product_id,

@@ -22,7 +22,7 @@ export default function AdminOrdersPage() {
   if (search) qs.set("search", search);
   if (status) qs.set("status", status);
 
-  const { data, loading, error, reload } = useAdminResource<{ total: number; items: OrderRow[] }>(`/admin/orders?${qs}`, [search, status, page]);
+  const { data, loading, error, reload } = useAdminResource<{ total: number; items: OrderRow[] }>(`/admin/orders-v2?${qs}`, [search, status, page]);
   const pages = data ? Math.max(1, Math.ceil(data.total / 20)) : 1;
 
   return (

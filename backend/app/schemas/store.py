@@ -152,6 +152,7 @@ class OrderStatusOut(BaseModel):
     tracking_code: str | None = None
     carrier: str | None = None
     shipping_method_name: str | None = None
+    admin_note: str | None = None
     items: list[OrderItemOut] = []
 
 
