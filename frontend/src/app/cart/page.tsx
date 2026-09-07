@@ -49,7 +49,7 @@ export default function CartPage() {
               <p className="mt-1 text-sm text-char-soft dark:text-ink-soft">{faPrice(l.price)}</p>
               <div className="mt-3">
                 <QuantityStepper
-                  value={l.quantity}
+                  value={l.qty}
                   onChange={(q) => setQuantity(l.productId, q, l.variantId ?? null)}
                   max={Math.max(l.stockQty, 1)}
                 />
@@ -64,7 +64,7 @@ export default function CartPage() {
                 <Trash2 size={18} aria-hidden="true" />
               </button>
               <p className="font-bold text-lajvard dark:text-lajvard-soft">
-                {faNum(l.price * l.quantity)}
+                {faNum(l.price * l.qty)}
               </p>
             </div>
           </article>

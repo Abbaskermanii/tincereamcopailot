@@ -10,7 +10,7 @@ import { Reveal } from "@/components/motion/reveal";
 import { CraftProcess } from "@/components/home/craft-process";
 import { WhyTinceram } from "@/components/home/why-tinceram";
 
-export const revalidate = 120;
+export const revalidate = 60;
 
 interface ProductListItem {
   id: string;

@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { api, mediaUrl, SITE_URL } from "@/lib/api";
-import { ProductView } from "@/components/store/product-view";
-import { RelatedProducts } from "@/components/store/related-products";
+import { ProductView, type ProductViewProduct } from "@/components/store/product-view";
+import { ProductTabs } from "@/components/store/product-tabs";
 import { ProductReviews } from "@/components/store/product-reviews";
-import { ProductQuestions } from "@/components/store/product-questions";
-import { RecentlyViewed } from "@/components/store/recently-viewed";
-import { TrackRecentlyViewed } from "@/components/store/track-recently-viewed";
+import { RelatedProducts } from "@/components/store/related-products";
 
-export const revalidate = 60;
+export const revalidate = 30;
 
 interface Props {
   params: { slug: string };
@@ -16,7 +14,6 @@ interface Props {
 
 async function getProduct(slug: string) {
   // revalidate 60s for product detail - stock sensitive but not real-time
-  // Use shorter cache for product vs 120 for catalog
   const product = await api.product(slug);
   return product;
 }
@@ -25,7 +22,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const product = await getProduct(params.slug);
   if (!product) return { title: "محصول یافت نشد" };
   const title = product.name;
-  const description = product.short_description || product.description?.slice(0, 160) || `${product.name} - دست‌ساز تن‌سرام`;
+  const description =
+    product.short_description || product.description?.slice(0, 160) || `${product.name} - دست‌ساز تن‌سرام`;
   const ogImage = product.primary_image_url ?? product.images?.[0]?.url ?? null;
   return {
     title: `${title} | تن‌سرام`,
@@ -44,29 +42,28 @@ export default async function ProductPage({ params }: Props) {
   const product = await getProduct(params.slug);
   if (!product) notFound();
 
-  // Map to view model - keep same as before but server-side
-  const viewProduct = {
-    id: product.id,
+  const viewProduct: ProductViewProduct = {
+    id: Number(product.id),
     slug: product.slug,
     name: product.name,
-    price: product.price,
-    compare_at_price: product.compare_at_price,
-    discount_percent: product.discount_percent,
-    stock_qty: product.stock_qty,
+    price: product.price ?? 0,
+    compare_at_price: product.compare_at_price ?? null,
+    discount_percent: product.discount_percent ?? null,
+    stock_qty: product.stock_qty ?? 0,
     images: product.images ?? [],
-    variants: product.variants ?? [],
+    variants: (product.variants ?? []) as unknown as ProductViewProduct["variants"],
     material: product.material ?? "",
     dimensions: product.dimensions ?? "",
-    weight_grams: product.weight_grams,
+    weight_grams: product.weight_grams ?? null,
     short_description: product.short_description ?? "",
     description: product.description ?? "",
     sku: product.sku ?? "",
     primary_image_url: product.primary_image_url ?? product.images?.[0]?.url ?? "",
-    category_slug: product.category_slug,
-    category_name: product.category_name,
+    category_slug: product.category_slug ?? null,
+    category_name: product.category_name ?? null,
   };
 
-  // JSON-LD for SEO - server rendered (no useEffect)
+  // JSON-LD for SEO - server rendered
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -85,7 +82,10 @@ export default async function ProductPage({ params }: Props) {
       url: `${SITE_URL}/product/${product.slug}`,
       priceCurrency: "IRR",
       price: String(Math.round(product.price ?? 0)),
-      availability: product.stock_qty > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      availability:
+        product.stock_qty > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
     },
   };
@@ -99,33 +99,37 @@ export default async function ProductPage({ params }: Props) {
         "@type": "ListItem",
         position: 2,
         name: product.category_name ?? "فروشگاه",
-        item: product.category_slug ? `${SITE_URL}/shop?category=${product.category_slug}` : `${SITE_URL}/shop`,
+        item: product.category_slug
+          ? `${SITE_URL}/shop?category=${product.category_slug}`
+          : `${SITE_URL}/shop`,
       },
-      { "@type": "ListItem", position: 3, name: product.name, item: `${SITE_URL}/product/${product.slug}` },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: product.name,
+        item: `${SITE_URL}/product/${product.slug}`,
+      },
     ],
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 pb-24 md:px-6 md:pb-12">
+    <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
-      <TrackRecentlyViewed slug={product.slug} name={product.name} price={product.price} imageUrl={product.images?.[0]?.url ?? ""} />
-
-      {/* 1) Gallery + buy box */}
+      {/* ۱) گالری + باکس خرید */}
       <ProductView product={viewProduct} />
 
-      {/* 2) Community: reviews & questions — now integrated in tabs */}
-      <div className="mt-14 md:mt-16">
-        <ProductReviews productId={product.id} />
-        <ProductQuestions productId={product.id} />
-      </div>
+      {/* ۲) تب‌های توضیحات / مشخصات / نگهداری / ارسال / پرسش‌ها */}
+      <ProductTabs product={viewProduct} />
 
-      {/* 3) Related products from the same collection */}
+      {/* ۳) نظرات مشتریان — بخش جداگانه */}
+      <section className="mt-12 md:mt-16">
+        <ProductReviews productId={viewProduct.id} />
+      </section>
+
+      {/* ۴) محصولات مرتبط از همان کالکشن */}
       <RelatedProducts categorySlug={product.category_slug ?? null} excludeSlug={product.slug} />
-
-      {/* 4) Recently viewed */}
-      <RecentlyViewed excludeSlug={product.slug} />
     </div>
   );
 }

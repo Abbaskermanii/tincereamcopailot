@@ -351,6 +351,10 @@ export default function AdminProductEditorPage() {
               ))}
             </dl>
           </AdminCard>
+
+          {step === "seo" && !!effectiveProductId && (
+            <RelatedProducts productId={effectiveProductId} />
+          )}
         </div>
       )}
 

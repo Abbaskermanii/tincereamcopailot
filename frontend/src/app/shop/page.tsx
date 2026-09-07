@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: "همه محصولات دست‌ساز آنیمور سرام؛ سفال و سرامیک دست‌ساز با لعاب‌دستی سنتی، مستقیم از کارگاه کرج.",
   alternates: { canonical: "/shop" },
 };
-export const revalidate = 90;
+export const revalidate = 60;
 
 export default async function ShopPage({
   searchParams,

@@ -1,312 +1,256 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { ThumbsUp, Star } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Field, Textarea, Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/toast-provider";
-import { useAuth } from "@/lib/auth-context";
-import { faNum } from "@/lib/format";
 
-interface Review {
-  id: string;
-  author_name: string;
-  rating: number;
-  title: string;
-  body: string;
-  is_buyer: boolean;
-  helpful_count: number;
-  admin_reply: string | null;
-  created_at: string;
+import React, { useEffect, useState } from "react";
+import { fetchProductReviews, submitProductReview, type ProductReview } from "@/lib/store-api";
+import { StarIcon, ChatIcon, CheckIcon } from "./icons";
+
+const fmt = (n: number) => new Intl.NumberFormat("fa-IR").format(n);
+
+function faDate(value?: string | null) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("fa-IR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(d);
 }
 
-interface ReviewStats {
-  total: number;
-  average_rating: number;
-  distribution: Record<string, number>;
-}
+const getName = (r: ProductReview) =>
+  r.name || r.user_name || r.author_name || "کاربر تن‌سرام";
+const getText = (r: ProductReview) => r.text || r.comment || r.body || "";
+const getRating = (r: ProductReview) => {
+  const n = Number(r.rating ?? 0);
+  return Number.isFinite(n) ? Math.min(5, Math.max(0, Math.round(n))) : 0;
+};
 
-function Stars({ value, size = 14 }: { value: number; size?: number }) {
+function Stars({ value, className = "h-4 w-4" }: { value: number; className?: string }) {
   return (
-    <span className="inline-flex items-center gap-0.5 text-amber-500" aria-label={`امتیاز ${faNum(value)} از ۵`}>
+    <span className="flex items-center gap-0.5 text-amber-500">
       {[1, 2, 3, 4, 5].map((i) => (
-        <Star key={i} size={size} className={i <= value ? "fill-amber-400 text-amber-500" : "text-char/25 dark:text-white/25"} />
+        <StarIcon key={i} filled={i <= value} className={className} />
       ))}
     </span>
   );
 }
 
-function ReviewSkeleton() {
-  return (
-    <div className="animate-pulse space-y-3 rounded-2xl bg-surface p-4 shadow-shelf dark:bg-black/25">
-      <div className="flex items-center gap-2">
-        <div className="h-9 w-9 rounded-full bg-char/10 dark:bg-white/10" />
-        <div className="space-y-1.5">
-          <div className="h-3 w-24 rounded bg-char/10 dark:bg-white/10" />
-          <div className="h-2.5 w-16 rounded bg-char/10 dark:bg-white/10" />
-        </div>
-      </div>
-      <div className="h-3 w-3/4 rounded bg-char/10 dark:bg-white/10" />
-      <div className="h-3 w-1/2 rounded bg-char/10 dark:bg-white/10" />
-    </div>
-  );
+interface Props {
+  productId: number | string;
+  onCountChange?: (count: number) => void;
 }
 
-export function ProductReviews({ productId }: { productId: string }) {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [stats, setStats] = useState<ReviewStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
-  const { toast } = useToast();
-  const { isAuthenticated, loading: authLoading } = useAuth();
+export function ProductReviews({ productId, onCountChange }: Props) {
+  const [items, setItems] = useState<ProductReview[] | null>(null);
 
+  const [showForm, setShowForm] = useState(false);
+  const [name, setName] = useState("");
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // ✅ فچ نظرات همین محصول با productId
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const { apiFetch } = await import("@/lib/api-client");
-        const res = await apiFetch(`/products/${productId}/reviews`, { signal: controller.signal } as RequestInit);
-        if (!cancelled && res.ok) {
-          const data = await res.json();
-          setReviews(Array.isArray(data.items) ? data.items : []);
-          setStats({
-            total: data.total ?? 0,
-            average_rating: data.average_rating ?? 0,
-            distribution: data.distribution ?? {},
-          });
-          setLoadError(false);
-        } else if (!cancelled && !res.ok) {
-          setLoadError(true);
-        }
-      } catch (e) {
-        if ((e as Error).name === "AbortError") return;
-        if (!cancelled) setLoadError(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    void load();
-    return () => { cancelled = true; controller.abort(); };
+    setItems(null);
+    fetchProductReviews(productId)
+      .then((list) => {
+        if (!cancelled) setItems(list);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [productId]);
 
-  async function submit(e: React.FormEvent) {
+  useEffect(() => {
+    if (items) onCountChange?.(items.length);
+  }, [items, onCountChange]);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (submitting) return;
-    if (!isAuthenticated) {
-      toast("برای ثبت نظر ابتدا وارد حساب خود شوید.", "error");
+    setFormError(null);
+    if (!name.trim()) {
+      setFormError("لطفاً نام خود را وارد کنید.");
       return;
     }
-    setSubmitting(true);
+    if (rating === 0) {
+      setFormError("لطفاً امتیاز خود را انتخاب کنید.");
+      return;
+    }
+    if (text.trim().length < 3) {
+      setFormError("متن نظر خیلی کوتاه است.");
+      return;
+    }
+
+    setSending(true);
     try {
-      const { apiFetch } = await import("@/lib/api-client");
-      const res = await apiFetch(`/reviews`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: productId, rating, title, body }),
-        _noDedup: true,
-        _noCache: true,
-      } as RequestInit);
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 401) throw new Error("نشست شما منقضی شده؛ دوباره وارد شوید.");
-      if (res.status === 409) throw new Error("شما قبلاً برای این محصول نظر ثبت کرده‌اید.");
-      if (!res.ok) throw new Error(data.detail || data.message || "خطا در ثبت نظر");
-      toast("نظر شما ثبت شد و پس از تأیید نمایش داده می‌شود.", "success");
-      setTitle("");
-      setBody("");
-      setRating(5);
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "خطا", "error");
+      const created = await submitProductReview({
+        productId,
+        name: name.trim(),
+        rating,
+        text: text.trim(),
+      });
+      const newItem: ProductReview =
+        created && (created.id || created.text)
+          ? created
+          : {
+              id: Date.now(),
+              name: name.trim(),
+              rating,
+              text: text.trim(),
+              created_at: new Date().toISOString(),
+            };
+      setItems((prev) => [newItem, ...(prev ?? [])]);
+      setText("");
+      setRating(0);
+      setName("");
+      setSuccessMsg("نظر شما با موفقیت ثبت شد. سپاس از همراهی‌تان 🙏");
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch {
+      setFormError("ثبت نظر با خطا مواجه شد. لطفاً دوباره تلاش کنید.");
     } finally {
-      setSubmitting(false);
+      setSending(false);
     }
   }
 
-  const toggleHelpful = useCallback(
-    async (reviewId: string) => {
-      if (!isAuthenticated) {
-        toast("برای ثبت بازخورد وارد شوید.", "error");
-        return;
-      }
-      const alreadyVoted = votedIds.has(reviewId);
-      try {
-        const { apiFetch } = await import("@/lib/api-client");
-        const res = await apiFetch(`/reviews/${reviewId}/helpful`, {
-          method: "POST",
-          _noDedup: true,
-          _noCache: true,
-        } as RequestInit);
-        if (res.status === 401) {
-          toast("برای ثبت بازخورد وارد شوید.", "error");
-          return;
-        }
-        if (!res.ok) return;
-        const data = await res.json();
-        setReviews((prev) => prev.map((r) => (r.id === reviewId ? { ...r, helpful_count: data.helpful_count } : r)));
-        setVotedIds((prev) => {
-          const next = new Set(prev);
-          if (alreadyVoted) next.delete(reviewId);
-          else next.add(reviewId);
-          return next;
-        });
-      } catch {
-        /* silent — non-critical action */
-      }
-    },
-    [isAuthenticated, votedIds, toast],
-  );
-
-  const activeRating = hoverRating || rating;
+  const list = items ?? [];
+  const average = list.length ? list.reduce((s, r) => s + getRating(r), 0) / list.length : 0;
 
   return (
-    <div className="space-y-6" id="reviews">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-xl font-extrabold">نظرات مشتریان</h3>
-        {stats && stats.total > 0 && (
-          <span className="flex items-center gap-1.5 text-sm text-char-soft dark:text-ink-soft">
-            <Stars value={Math.round(stats.average_rating)} />
-            {faNum(stats.average_rating)} از {faNum(stats.total)} نظر
-          </span>
-        )}
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-lg font-black text-stone-900 dark:text-white/90">نظرات مشتریان</h3>
+          {list.length > 0 && (
+            <span className="flex items-center gap-2">
+              <Stars value={Math.round(average)} />
+              <span className="text-sm font-bold text-stone-700 dark:text-stone-200">
+                {fmt(Math.round(average * 10) / 10)}
+              </span>
+              <span className="text-xs text-stone-400 dark:text-stone-500">({fmt(list.length)} نظر)</span>
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setShowForm((s) => !s)}
+          className="rounded-xl border border-stone-200 dark:border-white/15 px-4 py-2 text-sm font-bold text-stone-700 dark:text-stone-200 transition hover:border-stone-900 dark:hover:border-white/40 hover:bg-stone-900 hover:text-white"
+        >
+          {showForm ? "بستن فرم" : "ثبت نظر جدید"}
+        </button>
       </div>
 
-      {stats && stats.total > 0 && (
-        <div className="flex items-center gap-4 rounded-2xl bg-surface p-4 shadow-shelf dark:bg-black/25">
-          <div className="text-center">
-            <p className="text-3xl font-extrabold">{faNum(stats.average_rating)}</p>
-            <p className="mt-1 text-xs text-char-soft dark:text-ink-soft">میانگین امتیاز</p>
-          </div>
-          <div className="flex-1 space-y-1">
-            {[5, 4, 3, 2, 1].map((s) => {
-              const count = stats.distribution[String(s)] ?? 0;
-              return (
-                <div key={s} className="flex items-center gap-2 text-xs">
-                  <span className="w-8 shrink-0 text-char-soft dark:text-ink-soft">{faNum(s)} ★</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-char/10 dark:bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-lajvard transition-all dark:bg-lajvard-soft"
-                      style={{ width: `${stats.total ? (count / stats.total) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="w-6 shrink-0 text-left text-char-soft dark:text-ink-soft">{faNum(count)}</span>
-                </div>
-              );
-            })}
-          </div>
+      {successMsg && (
+        <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 px-4 py-3 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+          <CheckIcon className="h-4 w-4" />
+          {successMsg}
         </div>
       )}
 
-      <div className="space-y-4">
-        {loading ? (
-          <>
-            <ReviewSkeleton />
-            <ReviewSkeleton />
-          </>
-        ) : loadError ? (
-          <p className="rounded-2xl bg-clay/10 p-4 text-sm text-clay">خطا در بارگذاری نظرات؛ دوباره تلاش کنید.</p>
-        ) : reviews.length === 0 ? (
-          <p className="rounded-2xl bg-surface p-5 text-sm text-ink-soft shadow-shelf dark:bg-black/25">
-            هنوز نظری ثبت نشده؛ اولین نفر باشید.
+      {showForm && (
+        <form
+          onSubmit={handleSubmit}
+          className="mt-5 rounded-2xl border border-stone-200 dark:border-white/15 bg-stone-50/70 dark:bg-white/5 p-5"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-200">نام شما</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-xl border border-stone-200 dark:border-white/15 bg-white dark:bg-char px-4 py-2.5 text-sm outline-none transition focus:border-amber-700 focus:ring-2 focus:ring-amber-700/10"
+                placeholder="مثلاً عباس"
+              />
+            </label>
+            <div>
+              <span className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-200">امتیاز شما</span>
+              <div className="flex items-center gap-1 pt-1" onMouseLeave={() => setHoverRating(0)}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setRating(i)}
+                    onMouseEnter={() => setHoverRating(i)}
+                    aria-label={`${i} ستاره`}
+                    className="p-0.5 transition hover:scale-110"
+                  >
+                    <StarIcon
+                      filled={i <= (hoverRating || rating)}
+                      className="h-6 w-6 text-amber-500"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-200">نظر شما</span>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={4}
+              className="w-full resize-none rounded-xl border border-stone-200 dark:border-white/15 bg-white dark:bg-char px-4 py-2.5 text-sm leading-7 outline-none transition focus:border-amber-700 focus:ring-2 focus:ring-amber-700/10"
+              placeholder="تجربه‌تان از این محصول را بنویسید..."
+            />
+          </label>
+          {formError && <p className="mt-3 text-sm font-medium text-red-500 dark:text-red-400">{formError}</p>}
+          <button
+            type="submit"
+            disabled={sending}
+            className="mt-4 rounded-xl bg-stone-900 dark:bg-white/90 dark:text-char px-6 py-2.5 text-sm font-bold text-white transition hover:bg-stone-700 dark:hover:bg-stone-200 disabled:opacity-50"
+          >
+            {sending ? "در حال ثبت..." : "ثبت نظر"}
+          </button>
+        </form>
+      )}
+
+      {items === null ? (
+        <div className="mt-6 space-y-3">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-stone-100 dark:bg-white/10" />
+          ))}
+        </div>
+      ) : list.length === 0 ? (
+        <div className="mt-6 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-stone-200 dark:border-white/15 py-10 text-center">
+          <ChatIcon className="h-8 w-8 text-stone-300 dark:text-stone-600" />
+          <p className="text-sm font-medium text-stone-500 dark:text-stone-400">
+            هنوز نظری برای این محصول ثبت نشده است.
           </p>
-        ) : (
-          reviews.map((r) => (
-            <article key={r.id} className="rounded-2xl bg-surface p-4 shadow-shelf dark:bg-black/25">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-kiln-clay/25 to-lajvard/25 text-sm font-extrabold">
-                  {(r.author_name || "م").trim()[0]}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold">{r.author_name}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Stars value={r.rating} size={12} />
-                    {r.is_buyer && (
-                      <span className="rounded-full bg-firouzeh/15 px-2 py-0.5 text-[10px] font-bold text-firouzeh">
-                        خریدار تأییدشده
+          <p className="text-xs text-stone-400 dark:text-stone-500">اولین نفر باشید و نظر خود را ثبت کنید.</p>
+        </div>
+      ) : (
+        <ul className="mt-6 space-y-4">
+          {list.map((r, i) => (
+            <li
+              key={r.id ?? i}
+              className="rounded-2xl border border-stone-100 dark:border-white/10 bg-white dark:bg-char p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-400/15 text-sm font-black text-amber-900 dark:text-amber-300">
+                    {getName(r).trim().charAt(0) || "؟"}
+                  </span>
+                  <div>
+                    <span className="block text-sm font-bold text-stone-800 dark:text-white/85">{getName(r)}</span>
+                    {faDate(r.created_at ?? r.date) && (
+                      <span className="block text-[11px] text-stone-400 dark:text-stone-500">
+                        {faDate(r.created_at ?? r.date)}
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="mr-auto shrink-0 text-xs text-char-soft dark:text-ink-soft">
-                  {new Date(r.created_at).toLocaleDateString("fa-IR")}
-                </span>
+                <Stars value={getRating(r)} />
               </div>
-              {r.title && <p className="mt-3 text-sm font-bold">{r.title}</p>}
-              <p className="mt-1.5 whitespace-pre-line text-sm leading-7 text-char-soft dark:text-ink-soft">{r.body}</p>
-              {r.admin_reply && (
-                <div className="mt-3 rounded-xl bg-lajvard/10 p-3 text-sm leading-7 dark:bg-lajvard-soft/10">
-                  <span className="font-bold">پاسخ فروشگاه:</span> {r.admin_reply}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => void toggleHelpful(r.id)}
-                aria-pressed={votedIds.has(r.id)}
-                className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs transition-colors ${
-                  votedIds.has(r.id)
-                    ? "bg-firouzeh/15 text-firouzeh"
-                    : "text-char-soft hover:bg-char/5 hover:text-lajvard dark:text-ink-soft"
-                }`}
-              >
-                <ThumbsUp size={13} className={votedIds.has(r.id) ? "fill-firouzeh/30" : ""} />
-                مفید بود ({faNum(r.helpful_count)})
-              </button>
-            </article>
-          ))
-        )}
-      </div>
-      <form onSubmit={submit} className="rounded-2xl bg-surface p-5 shadow-shelf dark:bg-black/25">
-        <h4 className="font-bold">نظر خود را بنویسید</h4>
-        {!authLoading && !isAuthenticated && (
-          <p className="mt-2 rounded-xl bg-kiln-clay/10 p-3 text-xs leading-6">
-            برای ثبت نظر باید وارد حساب شوید.{" "}
-            <Link href="/auth" className="font-bold text-lajvard underline underline-offset-4 dark:text-lajvard-soft">
-              ورود / ثبت‌نام
-            </Link>
-          </p>
-        )}
-        <div className="mt-4 flex items-center gap-2">
-          <span className="text-sm font-medium">امتیاز شما:</span>
-          <div className="flex items-center gap-1" role="radiogroup" aria-label="انتخاب امتیاز">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={rating === n}
-                aria-label={`${n} ستاره`}
-                onMouseEnter={() => setHoverRating(n)}
-                onMouseLeave={() => setHoverRating(0)}
-                onClick={() => setRating(n)}
-                className="rounded p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lajvard"
-              >
-                <Star
-                  size={22}
-                  className={n <= activeRating ? "fill-amber-400 text-amber-500" : "text-char/25 dark:text-white/25"}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="mt-3">
-          <Field label="عنوان (اختیاری)">
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} />
-          </Field>
-        </div>
-        <div className="mt-3">
-          <Field label="متن نظر" required>
-            <Textarea value={body} onChange={(e) => setBody(e.target.value)} required minLength={3} maxLength={4000} />
-          </Field>
-        </div>
-        <Button type="submit" disabled={submitting || !isAuthenticated} className="mt-4 w-full sm:w-auto">
-          {submitting ? "در حال ارسال…" : "ثبت نظر (پس از تأیید)"}
-        </Button>
-      </form>
+              {getText(r) && <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-300">{getText(r)}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

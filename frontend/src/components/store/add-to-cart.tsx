@@ -93,14 +93,14 @@ export function AddToCartPanel({
         slug: product.slug,
         name: selectedVariant ? `${product.name} — ${selectedVariant.name}` : product.name,
         price,
-        imageUrl: selectedVariant?.image_url ?? product.primary_image_url,
+        imageUrl: selectedVariant?.image_url ?? product.primary_image_url ?? "",
         stockQty,
         variantId: selectedVariantId,
         variantName,
         variantSku: selectedVariant?.sku ?? null,
         variantImageUrl: selectedVariant?.image_url ?? null,
+        qty,
       },
-      qty,
     );
     setBurst(true);
     setTimeout(() => setBurst(false), 600);

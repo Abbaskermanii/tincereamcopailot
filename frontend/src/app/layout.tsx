@@ -3,6 +3,7 @@ import { Vazirmatn } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart";
+import { CartDrawer } from "@/components/store/cart-drawer";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { SettingsProvider } from "@/lib/settings-context";
@@ -50,8 +51,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       پرش به محتوای اصلی
                     </a>
                     <StoreChrome header={<Header />} footer={<Footer />}>
-                    {children}
-                  </StoreChrome>
+                      {children}
+                      <CartDrawer />
+                    </StoreChrome>
                     <ServiceWorkerRegistrar />
                   </ToastProvider>
                 </ErrorBoundary>

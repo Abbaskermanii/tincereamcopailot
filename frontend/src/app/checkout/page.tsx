@@ -143,7 +143,7 @@ export default function CheckoutPage() {
       const res = await apiFetch(`/orders`, {
         method: "POST",
         body: JSON.stringify({
-          items: lines.map((l) => ({ product_id: l.productId, quantity: l.quantity, variant_id: l.variantId ?? null })),
+          items: lines.map((l) => ({ product_id: l.productId, quantity: l.qty, variant_id: l.variantId ?? null })),
           customer_name: form.get("customer_name"),
           phone: form.get("phone"),
           email: form.get("email") || null,
@@ -328,10 +328,10 @@ export default function CheckoutPage() {
                     )}
                   </div>
                   <span className="min-w-0 flex-1 truncate">{l.name}</span>
-                  <span className="num-latin text-xs text-char-soft" aria-label={`تعداد ${l.quantity}`}>
-                    ×{new Intl.NumberFormat("fa-IR").format(l.quantity)}
+                  <span className="num-latin text-xs text-char-soft" aria-label={`تعداد ${l.qty}`}>
+                    ×{new Intl.NumberFormat("fa-IR").format(l.qty)}
                   </span>
-                  <span>{faPrice(l.price * l.quantity)}</span>
+                  <span>{faPrice(l.price * l.qty)}</span>
                 </li>
               ))}
             </ul>

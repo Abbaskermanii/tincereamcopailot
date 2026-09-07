@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiJson, getErrorMessage } from "@/lib/api-client";
+import { apiJson, getErrorMessage, invalidateApiCache } from "@/lib/api-client";
 import { useToast } from "@/components/ui/toast-provider";
 
 /** Debounced value — used by every admin search box. */
@@ -26,7 +26,7 @@ export function useAdminResource<T>(path: string | null, deps: unknown[] = []) {
     setLoading(true);
     setError(null);
     try {
-      setData(await apiJson<T>(path));
+      setData(await apiJson<T>(path, { _noCache: true }));
     } catch (e) {
       const msg = getErrorMessage(e);
       setError(msg);
@@ -51,6 +51,7 @@ export function useAdminMutation() {
       setBusy(true);
       try {
         const result = await apiJson<T>(path, init);
+        invalidateApiCache();
         if (init.successMessage) toast(init.successMessage, "success");
         return result;
       } catch (e) {

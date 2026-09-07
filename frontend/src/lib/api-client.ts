@@ -68,6 +68,14 @@ const pendingRequests = new Map<string, Promise<Response>>();
 const lastRequestAt = new Map<string, number>();
 const responseCache = new Map<string, { res: Response; expiry: number }>();
 
+/** Cache invalidation — call after any successful mutation so admin UI never shows stale data. */
+export function invalidateApiCache(prefix?: string): void {
+  if (!prefix) { responseCache.clear(); return; }
+  for (const key of [...responseCache.keys()]) {
+    if (key.includes(prefix)) responseCache.delete(key);
+  }
+}
+
 function throttleKey(url: string): string {
   try {
     const u = new URL(url);
@@ -109,7 +117,7 @@ export async function apiFetch(
   }
 
   // Throttle ساده: اگر خیلی سریع درخواست تکراری زدیم، از کش stale استفاده کن
-  if (method === "GET" && shouldThrottle(url)) {
+  if (method === "GET" && !init._noCache && shouldThrottle(url)) {
     const cached = responseCache.get(dedupKey);
     if (cached) return cached.res.clone();
   }
@@ -149,7 +157,10 @@ export async function apiFetch(
   }
 }
 
-export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiJson<T>(
+  path: string,
+  init: RequestInit & { _retry?: boolean; _noDedup?: boolean; _noCache?: boolean } = {},
+): Promise<T> {
   const res = await apiFetch(path, init);
   if (!res.ok) {
     let msg = `خطا: ${res.status}`;
