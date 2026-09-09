@@ -36,7 +36,6 @@ export function AccountPanel({ section = "profile" }: { section?: string }) {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [cropperOpen, setCropperOpen] = useState(false);
   const { toast } = useToast();
 
   const reload = async () => {
@@ -134,6 +133,11 @@ function ProfileView({ data, toast, avatarUrl, setAvatarUrl }: { data: { email: 
   const [saving, setSaving] = useState(false);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  useEffect(() => {
+    if (avatarUrl) {
+      setAvatarDataUrl(null);
+    }
+  }, [avatarUrl]);
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -147,12 +151,10 @@ function ProfileView({ data, toast, avatarUrl, setAvatarUrl }: { data: { email: 
     if (avatarDataUrl) {
       setUploading(true);
       try {
-        // The uploader emits base64 data-URLs → convert to File before upload.
         const file = await dataUrlToFile(avatarDataUrl, "avatar.png");
         const formData = new FormData();
         formData.append("file", file);
-        // NOTE: no manual Content-Type — the browser sets multipart boundary.
-        const res = await apiFetch("/avatar/upload", { method: "POST", body: formData });
+        const res = await apiFetch("/users/me/avatar", { method: "POST", body: formData });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(j.detail || j.message || "آپلود تصویر شکست خورد");
         setAvatarUrl(j.url);
@@ -209,8 +211,15 @@ function ProfileView({ data, toast, avatarUrl, setAvatarUrl }: { data: { email: 
         <Field label="نام کامل"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field>
         <Field label="موبایل"><Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" pattern="09\d{9}" placeholder="09123456789" /></Field>
         <Upload
-          value={avatarDataUrl}
-          onFileChange={(v) => setAvatarDataUrl(v)}
+          value={avatarDataUrl ?? null}
+          onFileChange={(v) => {
+            setAvatarDataUrl(v ? v : null);
+            if (v) {
+              const dataUrlParts = v.split(",");
+              const mime = dataUrlParts[0]?.split(":")[1]?.split(";")[0] ?? "image/png";
+              setAvatarUrl(`data:${mime};base64,${dataUrlParts[1] ?? ""}`);
+            }
+          }}
         />
         <div className="border-t border-char/10 pt-4 dark:border-white/10">
           <p className="mb-3 font-bold">تغییر رمز عبور</p>
@@ -259,7 +268,7 @@ function AddressesView({ data, reload, toast }: { data: Address[]; reload: () =>
   async function doDelete(id: string) {
     if (!confirm("این نشانی حذف شود؟")) return;
     try {
-      const res = await apiFetch(`/auth/addresses/${id}`, { method: "DELETE", headers: authHeaders() });
+      const res = await apiFetch(`/users/me/addresses/${id}`, { method: "DELETE", headers: authHeaders() });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.detail || "حذف ناموفق");
@@ -349,10 +358,23 @@ function NotificationsView({ data, reload, toast }: { data: Notification[]; relo
     } catch { toast("خطا در به‌روزرسانی", "error"); }
   }
   if (!Array.isArray(data) || data.length === 0) return <p className="mt-6 rounded-2xl bg-surface p-6 text-center text-ink-soft dark:bg-black/25">اعلانی ندارید.</p>;
-  const unread = data.filter((n) => !n.is_read).length;
+  const unreadCount = data.filter((n) => !n.is_read).length;
+  const markAllRead = async () => {
+    try {
+      const res = await apiFetch("/users/me/notifications/read-all", { method: "POST", headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      toast("همه خوانده شد.", "success");
+      void reload();
+    } catch { toast("خطا در بهروزرسانی", "error"); }
+  };
   return (
     <div className="mt-6 space-y-3">
-      {unread > 0 && <p className="text-sm font-medium text-lajvard dark:text-lajvard-soft">{unread} اعلان خوانده‌نشده دارید.</p>}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-lajvard dark:text-lajvard-soft">{unreadCount} اعلان خواندهنشده دارید.</p>
+        {unreadCount > 0 && (
+          <Button size="sm" variant="secondary" onClick={() => void markAllRead()}>خواندن همه</Button>
+        )}
+      </div>
       {data.map((n) => (
         <div key={n.id} className={`rounded-2xl p-4 shadow-shelf ${n.is_read ? "bg-surface" : "bg-lajvard/10 dark:bg-lajvard-soft/10 border border-lajvard/20"}`}>
           <div className="flex items-start justify-between gap-4">

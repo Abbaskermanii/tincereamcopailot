@@ -30,7 +30,7 @@ export default function OrderFailure() {
         _noDedup: true,
       } as RequestInit);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) setErr(data.detail || "پرداخت مجدد ممکن نشد.");
+      if (!res.ok) setErr(Array.isArray(data.detail) ? data.detail.map((d: { msg: string }) => d.msg).join(" ") : typeof data.detail === "string" ? data.detail : "پرداخت مجدد ممکن نشد.");
       else if (data.payment_url) window.location.href = data.payment_url;
     } catch {
       setErr("ارتباط با سرور برقرار نشد.");

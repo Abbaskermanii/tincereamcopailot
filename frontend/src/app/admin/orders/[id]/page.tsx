@@ -128,6 +128,7 @@ export default function AdminOrderDetailPage() {
             {order.campaign_discount_amount > 0 && <div className="flex justify-between"><dt className="text-ink-soft">تخفیف کمپین</dt><dd className="text-clay">{faPrice(order.campaign_discount_amount)}</dd></div>}
             {order.coupon_code && <div className="flex justify-between"><dt className="text-ink-soft">کد تخفیف</dt><dd className="num-latin">{order.coupon_code}</dd></div>}
             {order.gift_wrap && <div className="flex justify-between"><dt className="text-ink-soft">بسته هدیه</dt><dd>✓</dd></div>}
+            {order.gift_note && <div className="flex justify-between"><dt className="text-ink-soft">یادداشت هدیه</dt><dd className="text-left max-w-[60%]">{order.gift_note}</dd></div>}
             {order.payment_ref_id && <div className="flex justify-between"><dt className="text-ink-soft">کد پرداخت</dt><dd className="num-latin">{order.payment_ref_id}</dd></div>}
           </dl>
         </AdminCard>

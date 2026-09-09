@@ -226,8 +226,7 @@ def public_related(product_id: str, s: Session = Depends(get_session)):
     return s.exec(select(Product).where(Product.id.in_(ids), Product.is_active == True)).all() if ids else []
 
 class ArticleIn(BaseModel):
-    title: str; slug: str; body: str; excerpt: str = ""; cover_url: str | None = None; category_id: str | None = None; is_published: bool = False
-    tags: str = ""
+    title: str; slug: str; body: str; excerpt: str = ""; cover_url: str | None = None; category_id: str | None = None; is_published: bool = False; meta_title: str | None = None; meta_description: str | None = None
     tags: str = ""
 
 
@@ -276,13 +275,45 @@ def delete_article_category(category_id: str, _: User = Depends(admin_user), s: 
 def admin_articles(_: User = Depends(admin_user), s: Session = Depends(get_session)):
     rows = s.exec(select(Article).order_by(Article.created_at.desc())).all()
     cats = {c.id: c.name for c in s.exec(select(ArticleCategory)).all()}
+    author_ids = [a.author_id for a in rows if a.author_id]
+    authors = {u.id: u for u in s.exec(select(User).where(User.id.in_(author_ids))).all()} if author_ids else {}
     return [
         {
-            **{k: getattr(a, k) for k in ("id", "title", "slug", "excerpt", "cover_url", "category_id", "is_published", "published_at", "created_at")},
+            **{k: getattr(a, k) for k in ("id", "title", "slug", "excerpt", "cover_url", "category_id", "is_published", "published_at", "created_at", "updated_at", "meta_title", "meta_description")},
             "category_name": cats.get(a.category_id) if a.category_id else None,
+            "author_name": (authors[a.author_id].full_name or authors[a.author_id].email) if a.author_id and a.author_id in authors else None,
         }
         for a in rows
     ]
+
+
+@admin.get("/articles/{article_id}")
+def get_article_admin(article_id: str, _: User = Depends(admin_user), s: Session = Depends(get_session)):
+    row = s.get(Article, article_id)
+    if not row:
+        raise HTTPException(404, "مقاله یافت نشد")
+    author = s.get(User, row.author_id) if row.author_id else None
+    cat = s.get(ArticleCategory, row.category_id) if row.category_id else None
+    return {
+        "id": row.id,
+        "title": row.title,
+        "slug": row.slug,
+        "excerpt": row.excerpt,
+        "body": row.body,
+        "cover_url": row.cover_url,
+        "category_id": row.category_id,
+        "category_name": cat.name if cat else None,
+        "is_published": row.is_published,
+        "published_at": row.published_at,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+        "meta_title": row.meta_title,
+        "meta_description": row.meta_description,
+        "tags": getattr(row, "tags", ""),
+        "author_id": row.author_id,
+        "author_name": (author.full_name or author.email) if author else None,
+    }
+
 
 def _sanitize_html(raw: str) -> str:
     """Minimal sanitization for Article.body — strip script/style and on* handlers."""
@@ -324,7 +355,7 @@ def update_article(article_id: str, data: dict, _: User = Depends(admin_user), s
         raise HTTPException(404, "مقاله یافت نشد")
     if "slug" in data and s.exec(select(Article).where(Article.slug == data["slug"], Article.id != article_id)).first():
         raise HTTPException(409, "slug تکراری است")
-    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "published_at", "tags"}
+    allowed = {"title", "slug", "body", "excerpt", "cover_url", "category_id", "is_published", "published_at", "tags", "meta_title", "meta_description"}
     for key, value in data.items():
         if key in allowed:
             if key in ("body", "excerpt") and isinstance(value, str):

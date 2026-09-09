@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArrowRight, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Step {

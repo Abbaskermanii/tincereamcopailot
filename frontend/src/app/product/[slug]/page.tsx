@@ -43,7 +43,7 @@ export default async function ProductPage({ params }: Props) {
   if (!product) notFound();
 
   const viewProduct: ProductViewProduct = {
-    id: Number(product.id),
+    id: product.id,
     slug: product.slug,
     name: product.name,
     price: product.price ?? 0,

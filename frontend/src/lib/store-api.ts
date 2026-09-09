@@ -15,6 +15,7 @@ export interface ProductReview {
   text?: string;
   comment?: string;
   body?: string;
+  admin_reply?: string | null;
   created_at?: string;
   date?: string;
 }

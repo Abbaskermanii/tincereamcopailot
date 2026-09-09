@@ -90,6 +90,7 @@ def create_order(
     customer: dict,
     user: User | None = None,
     variant_selections: dict[str, str] | None = None,
+    address_id: str | None = None,
 ) -> tuple[Order, list[OrderItem]]:
     """Atomically reserve stock and persist order + items.
 
@@ -246,6 +247,7 @@ def create_order(
         shipping_method_name=shipping_method.name if shipping_method else None,
         status=OrderStatus.pending,
         user_id=user.id if user else None,
+        address_id=address_id,
     )
     session.add(order)
     session.flush()
@@ -346,7 +348,7 @@ async def verify_and_finalize(
     return True, "پرداخت با موفقیت انجام شد.", order
 
 
-def expire_stale_pending_orders(session: Session, ttl_minutes: int = 30) -> int:
+def expire_stale_pending_orders(session: Session, ttl_minutes: int = 1440) -> int:
     """Cancel pending orders older than TTL and restore stock. Returns count expired."""
     from datetime import timedelta
 
@@ -359,7 +361,7 @@ def expire_stale_pending_orders(session: Session, ttl_minutes: int = 30) -> int:
         _restock(session, order)
         order.status = OrderStatus.cancelled
         session.add(order)
-        add_status_history(session, order, OrderStatus.cancelled.value, note="انقضای خودکار رزرو پس از ۳۰ دقیقه")
+        add_status_history(session, order, OrderStatus.cancelled.value, note="انقضای خودکار رزرو پس از ۲۴ ساعت")
         count += 1
     if count:
         session.commit()

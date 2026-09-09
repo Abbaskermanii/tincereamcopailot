@@ -7,13 +7,8 @@ import {
 import { TrendingUp, TrendingDown, ShoppingBag, Package, Users, Clock } from "lucide-react";
 import {
   AdminCard, DataTable, ErrorBanner, PageHeader, StatCard, StatusBadge,
-  Carousel,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/components/admin/kit";
 import { useAdminResource } from "@/lib/admin-hooks";
-import { mediaUrl } from "@/lib/api";
 import { faNum, faPrice, toPersianDigits } from "@/lib/format";
 
 interface DashboardData {
@@ -34,36 +29,6 @@ interface DashboardData {
 }
 
 
-interface ProductItem {
-  id: string;
-  name: string;
-  image_url: string | null;
-  price: number;
-  compare_at_price: number | null;
-  slug: string;
-}
-
-interface CategoryItem {
-  id: string;
-  name: string;
-  slug: string;
-  image_url: string | null;
-}
-
-interface ArticleItem {
-  id: string;
-  title: string;
-  slug: string;
-  excerpt: string | null;
-  published_at: string | null;
-}
-
-interface FaqItem {
-  id: string;
-  question: string;
-  answer: string;
-}
-
 function ChangePct({ value }: { value: number | null }) {
   if (value === null) return <p className="mt-1 text-xs text-ink-soft">مقایسه با دورهٔ قبل موجود نیست</p>;
   const up = value >= 0;
@@ -72,62 +37,6 @@ function ChangePct({ value }: { value: number | null }) {
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {faNum(Math.abs(value))}٪ نسبت به دورهٔ قبل
     </p>
-  );
-}
-
-function ProductCard({ product }: { product: ProductItem }) {
-  return (
-    <div className="glaze-edge rounded-xl p-3 transition-all hover:shadow-lifted">
-      <Link href={`/admin/products/${product.id}`} className="flex min-w-0 flex-1 items-center gap-3 hover:text-lajvard">
-        {product.image_url ? (
-          <img src={mediaUrl(product.image_url)} alt={product.name} className="h-16 w-16 shrink-0 rounded-lg object-cover" />
-        ) : (
-          <div className="h-16 w-16 shrink-0 rounded-lg bg-lajvard/10 flex items-center justify-center">
-            <Package className="h-6 w-6 text-lajvard dark:text-lajvard-soft" />
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-sm">{product.name}</p>
-          <p className="mt-1 text-xs text-ink-soft">{faPrice(product.price)}</p>
-        </div>
-      </Link>
-    </div>
-  );
-}
-
-function CategoryCard({ category }: { category: CategoryItem }) {
-  return (
-    <Link href={`/admin/categories`} className="glaze-edge flex h-24 items-center justify-center rounded-xl border border-char/15 p-3 transition-all hover:shadow-shelf hover:border-lajvard/30 dark:border-white/15">
-      {category.image_url ? (
-        <img src={mediaUrl(category.image_url)} alt={category.name} className="h-full w-full object-cover rounded-lg" />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center">
-          <Package className="h-10 w-10 text-ink-soft" />
-        </div>
-      )}
-    </Link>
-  );
-}
-
-function ArticleCard({ article }: { article: ArticleItem }) {
-  const formattedDate = article.published_at
-    ? new Date(article.published_at).toLocaleDateString('fa-IR')
-    : '';
-
-  return (
-    <div className="glaze-edge flex h-24 flex-1 flex-col justify-between rounded-xl p-3 transition-all hover:shadow-shelf">
-      <p className="line-clamp-2 font-medium text-sm">{article.title}</p>
-      <p className="text-xs text-ink-soft">{formattedDate}</p>
-    </div>
-  );
-}
-
-function FaqCard({ faq }: { faq: FaqItem }) {
-  return (
-    <div className="glaze-edge flex flex-1 flex-col justify-between rounded-xl p-3 transition-all hover:shadow-shelf">
-      <p className="font-medium text-sm">{faq.question}</p>
-      <p className="line-clamp-2 text-xs text-ink-soft">{faq.answer}</p>
-    </div>
   );
 }
 

@@ -50,6 +50,7 @@ class Order(UUIDMixin, TimestampMixin, table=True):
     payment_authority: str | None = Field(default=None, max_length=128)
     payment_ref_id: str | None = Field(default=None, max_length=128)
     user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
+    address_id: str | None = Field(default=None, foreign_key="addresses.id", index=True)
     shipping_method_id: str | None = Field(default=None, foreign_key="shipping_methods.id")
     shipping_method_name: str | None = Field(default=None, max_length=128)
     tracking_code: str | None = Field(default=None, max_length=64, index=True)

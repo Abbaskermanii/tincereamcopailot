@@ -18,8 +18,11 @@ export default function AdminMessagesPage() {
   const [editing, setEditing] = useState<ContactMessage | null>(null);
   const [deleting, setDeleting] = useState<ContactMessage | null>(null);
   const [form, setForm] = useState({ reply: "" });
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyForm, setNotifyForm] = useState({ title: "", body: "", user_id: "", all_users: false });
 
   const { data: messages, loading, error, reload } = useAdminResource<ContactMessage[]>("/admin/messages");
+  const { data: users } = useAdminResource<Array<{ id: string; full_name: string; email: string }>>("/admin/users");
   const { mutate, busy } = useAdminMutation();
 
   const filtered = (messages ?? []).filter((m) => {
@@ -38,6 +41,21 @@ export default function AdminMessagesPage() {
     if (ok) { setEditing(null); void reload(); }
   };
 
+  const submitNotify = async () => {
+    if (!notifyForm.title.trim()) return;
+    const ok = await mutate("/admin/notifications", {
+      method: "POST",
+      body: JSON.stringify({
+        title: notifyForm.title,
+        body: notifyForm.body,
+        all_users: notifyForm.all_users,
+        user_ids: notifyForm.all_users ? undefined : notifyForm.user_id ? [notifyForm.user_id] : [],
+      }),
+      successMessage: "اعلان ارسال شد.",
+    });
+    if (ok) { setNotifyOpen(false); setNotifyForm({ title: "", body: "", user_id: "", all_users: false }); }
+  };
+
   const markRead = async (m: ContactMessage) => {
     await mutate(`/admin/messages/${m.id}/read`, { method: "PATCH" });
     void reload();
@@ -51,7 +69,48 @@ export default function AdminMessagesPage() {
 
   return (
     <div>
-      <PageHeader title="پیام‌های تماس" description="پیام‌های دریافتی از فرم تماس" />
+      <PageHeader
+        title="پیامهای تماس"
+        description="پیامهای دریافتی از فرم تماس"
+        action={<button type="button" onClick={() => setNotifyOpen(true)} className="min-h-[44px] rounded-xl bg-lajvard px-4 text-sm text-white dark:bg-lajvard-soft dark:text-char">اعلان جدید</button>}
+      />
+
+      <Modal open={notifyOpen} onClose={() => setNotifyOpen(false)} title="ارسال اعلان به کاربر">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submitNotify();
+          }}
+          className="space-y-4"
+        >
+          <Field label="عنوان" required>
+            <TextInput required value={notifyForm.title} onChange={(e) => setNotifyForm({ ...notifyForm, title: e.target.value })} />
+          </Field>
+          <Field label="متن اعلان">
+            <TextInput value={notifyForm.body} onChange={(e) => setNotifyForm({ ...notifyForm, body: e.target.value })} />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={notifyForm.all_users} onChange={(e) => setNotifyForm({ ...notifyForm, all_users: e.target.checked })} />
+            ارسال به همه کاربران
+          </label>
+          {!notifyForm.all_users && (
+            <Field label="کاربر مقصد" required>
+              <select
+                required
+                value={notifyForm.user_id}
+                onChange={(e) => setNotifyForm({ ...notifyForm, user_id: e.target.value })}
+                className="w-full min-h-[44px] rounded-xl border border-char/20 bg-surface px-3 py-2.5 text-sm dark:border-white/20"
+              >
+                <option value="">— انتخاب کاربر —</option>
+                {(users ?? []).map((u) => (
+                  <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <FormActions onCancel={() => setNotifyOpen(false)} busy={busy} />
+        </form>
+      </Modal>
 
       {error && <ErrorBanner message={error} onRetry={reload} />}
 

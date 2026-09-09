@@ -5,6 +5,19 @@ import { ProductQuestions } from "./product-questions";
 import type { ProductViewProduct } from "./product-view";
 import { CheckIcon, ShieldCheckIcon, TruckIcon, PackageIcon } from "./icons";
 
+/** Server-safe HTML sanitiser (same policy as blog body). */
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    .replace(/ on[a-z]+="[^"]*"/gi, "")
+    .replace(/ on[a-z]+='[^']*'/gi, "")
+    .replace(/<br\s*\/>/gi, "\n")
+    .replace(/<p[^>]*>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "");
+}
+
 const fmt = (n: number) => new Intl.NumberFormat("fa-IR").format(n);
 
 type TabKey = "description" | "specs" | "care" | "shipping" | "questions";
@@ -98,21 +111,15 @@ export function ProductTabs({ product }: { product: ProductViewProduct }) {
         {active === "description" && (
           <div>
             {product.description ? (
-              <p className="whitespace-pre-line text-[15px] leading-8 text-stone-600 dark:text-stone-300">
-                {product.description}
-              </p>
+              <div
+                className="article-body text-[15px] text-stone-600 dark:text-stone-300"
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
+              />
             ) : product.short_description ? (
               <p className="text-[15px] leading-8 text-stone-600 dark:text-stone-300">{product.short_description}</p>
             ) : (
               <p className="text-sm text-stone-400 dark:text-stone-500">توضیحاتی برای این محصول ثبت نشده است.</p>
             )}
-            <div className="mt-6 flex items-start gap-3 rounded-2xl bg-amber-50 dark:bg-amber-400/10 p-4 text-sm leading-7 text-amber-900 dark:text-amber-300">
-              <span className="text-lg">🏺</span>
-              <p>
-                همه محصولات تن‌سرام دست‌ساز ساخته می‌شوند؛ بنابراین ممکن است تفاوت‌های ظریف و زیبایی
-                با تصویر داشته باشد. این تفاوت‌ها امضای هنر دست است، نه عیب!
-              </p>
-            </div>
           </div>
         )}
 

@@ -24,7 +24,7 @@ export function PageHeader({ title, description, action }: { title: string; desc
 
 export function AdminCard({ title, action, children, className }: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("glaze-edge rounded-wobble bg-surface p-5 shadow-shelf dark:bg-black/25", className)}>
+    <section className={cn("glaze-edge rounded-wobble bg-surface p-3 shadow-shelf sm:p-5 dark:bg-black/25", className)}>
       {(title || action) && (
         <div className="mb-4 flex items-center justify-between gap-3">
           {title && <h2 className="font-bold">{title}</h2>}
@@ -226,8 +226,8 @@ export function DataTable<T extends { id?: string }>({ columns, rows, actions, e
     );
   }
   return (
-    <div className="glaze-edge overflow-hidden rounded-wobble bg-surface shadow-shelf dark:bg-black/25">
-      <table className="w-full min-w-[640px] text-right text-sm">
+    <div className="glaze-edge overflow-x-auto rounded-wobble bg-surface shadow-shelf dark:bg-black/25">
+      <table className="w-full min-w-[480px] text-right text-sm">
         <thead>
           <tr className="border-b border-char/10 text-xs uppercase tracking-wider text-ink-soft dark:border-white/10">
             {columns.map((c) => <th key={c.key} className={cn("whitespace-nowrap p-4 font-medium", c.className)}>{c.label}</th>)}

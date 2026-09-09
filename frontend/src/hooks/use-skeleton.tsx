@@ -2,16 +2,10 @@
 
 import React, { useState } from "react";
 
-interface UseSkeletonResult<T> {
-  isLoading: boolean;
-  show: () => void;
-  hide: () => void;
-}
-
 /**
  * Hook to manage loading states with skeleton UI
  */
-export function useSkeleton<T>(showInitialLoading = true) {
+export function useSkeleton(showInitialLoading = true) {
   const [isLoading, setIsLoading] = useState(showInitialLoading);
 
   const show = () => setIsLoading(true);
@@ -27,7 +21,7 @@ export function useSkeleton<T>(showInitialLoading = true) {
 /**
  * Component for rendering skeleton while data is loading
  */
-export const WithSkeleton = <T,>({
+export const WithSkeleton = ({
   isLoading,
   children,
   skeletonTemplate,

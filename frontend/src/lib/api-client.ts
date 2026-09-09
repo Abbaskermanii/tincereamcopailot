@@ -16,7 +16,7 @@ export interface ApiError {
 // --- دریافت refresh token از cookie (method fluent) ---
 function getRefreshTokenFromCookie(): string | null {
   if (typeof window === "undefined") return null;
-  const match = document.cookie.match(/(?:^|; )tinceram_refresh=([^;])/);
+  const match = document.cookie.match(/(?:^|; )tinceram_refresh=([^;]+)/);
   return match?.[1] ?? null;
 }
 
@@ -41,11 +41,7 @@ async function tryRefresh(): Promise<boolean> {
         document.cookie = "tinceram_refresh=; max-age=0; path=/";
         return false;
       }
-      const data = await res.json();
       // سرвер معمولاً JSON برنمی‌گردونه، اما ممکن است برای سازگاری cookie ری‑SET کنه
-      if (data.access_token) {
-        document.cookie = `tinceram_access=${data.access_token}; path=/; max-age=${60 * 60 * 24 * 30}`; // 30 days
-      }
       return true;
     } catch {
       return false;
@@ -56,7 +52,7 @@ async function tryRefresh(): Promise<boolean> {
   return refreshPromise;
 }
 
-// --- authHeaders: هیچ Bearer دستی نمی‌فرستد — 쿠kicredentials: "include" Bahá
+// --- authHeaders: توکنها فقط با کوکی httponly ارسال میشوند (credentials: "include") ---
 export function authHeaders(json = false): HeadersInit {
   const h: Record<string, string> = {};
   if (json) h["Content-Type"] = "application/json";
@@ -129,12 +125,12 @@ export async function apiFetch(
       headers.set("Content-Type", "application/json");
     }
 
-    let res = await fetch(url, { ...init, headers, credentials: "include" });
+    let res = await fetch(url, { ...init, headers, credentials: "include", cache: init.cache ?? "no-store" });
 
     if (res.status === 401 && !init._retry) {
       const refreshed = await tryRefresh();
       if (refreshed) {
-        res = await fetch(url, { ...init, headers, credentials: "include", _retry: true } as RequestInit & { _retry?: boolean });
+        res = await fetch(url, { ...init, headers, credentials: "include", cache: init.cache ?? "no-store", _retry: true } as RequestInit & { _retry?: boolean });
       }
     }
     return res;

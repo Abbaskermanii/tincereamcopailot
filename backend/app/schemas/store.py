@@ -94,13 +94,14 @@ class OrderItemIn(BaseModel):
 
 class OrderCreate(BaseModel):
     items: list[OrderItemIn] = Field(min_length=1)
-    customer_name: str = Field(min_length=2, max_length=255)
-    phone: str = Field(pattern=r"^09\d{9}$")
+    address_id: str | None = None
+    customer_name: str | None = Field(default=None, min_length=2, max_length=255)
+    phone: str | None = Field(default=None, pattern=r"^09\d{9}$")
     email: str | None = None
-    address: str = Field(min_length=10, max_length=1024)
-    city: str = Field(min_length=2, max_length=128)
-    province: str = Field(min_length=2, max_length=128)
-    postal_code: str = Field(pattern=r"^\d{10}$")
+    address: str | None = Field(default=None, min_length=10, max_length=1024)
+    city: str | None = Field(default=None, min_length=2, max_length=128)
+    province: str | None = Field(default=None, min_length=2, max_length=128)
+    postal_code: str | None = Field(default=None, pattern=r"^\d{10}$")
     coupon_code: str | None = None
     gift_wrap: bool = False
     gift_note: str | None = Field(default=None, max_length=512)

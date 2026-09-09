@@ -156,6 +156,7 @@ def submit_review(
         title=payload.title,
         body=payload.body,
         is_buyer=is_buyer,
+        is_approved=True,  # auto-publish: shop owner prefers immediate visibility
     )
     session.add(review)
     session.commit()
@@ -219,6 +220,7 @@ def submit_question(payload: QuestionIn, session: Session = Depends(get_session)
             user_id=user.id if user else None,
             author_name=user.full_name if user else "کاربر مهمان",
             question=payload.question,
+            is_published=True,  # auto-publish
         )
     )
     session.commit()

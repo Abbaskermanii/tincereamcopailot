@@ -1,6 +1,3 @@
-import Image from "next/image";
-import Link from "next/link";
-import { Star } from "lucide-react";
 
 interface ProductImage {
   id: string;
@@ -91,14 +88,6 @@ interface BreadcrumbListSchema {
   }>;
 }
 
-interface WebPageSchema {
-  "@context": string;
-  "@type": "WebPage";
-  name: string;
-  description: string;
-  inLanguage: string;
-}
-
 export function generateArticleSchema(article: {
   id: string;
   title: string;
@@ -142,23 +131,6 @@ export function generateWebPageSchema() {
     name: siteConfig.title,
     description: siteConfig.description,
     inLanguage: "fa",
-  };
-}
-
-interface OrganizationSchema {
-  "@context": string;
-  "@type": "Organization";
-  name: string;
-  url: string;
-  logo: string;
-  sameAs?: string[];
-  contactPoint?: {
-    "@type": "ContactPoint";
-    email: string;
-    telephone: string;
-    contactType: "sales";
-    areaServed: "IR";
-    availableLanguage: "fa-IR";
   };
 }
 

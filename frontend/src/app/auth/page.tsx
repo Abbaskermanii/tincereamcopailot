@@ -15,6 +15,12 @@ function AuthInner() {
   const router = useRouter();
   const params = useSearchParams();
   const initialToken = params.get("token");
+  const rawRedirect = params.get("redirect");
+  // Sanitize: only internal paths starting with / and not containing //
+  const redirect =
+    rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.includes("//")
+      ? rawRedirect
+      : null;
   const { refresh } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<Mode>(initialToken ? "reset_confirm" : "login");
@@ -26,6 +32,10 @@ function AuthInner() {
   useEffect(() => {
     if (initialToken) setForm((p) => ({ ...p, reset_token: initialToken }));
   }, [initialToken]);
+
+  function goAfterAuth() {
+    router.push(redirect || "/account");
+  }
 
   async function handleAuth(e: FormEvent) {
     e.preventDefault();
@@ -49,12 +59,12 @@ function AuthInner() {
         const msg = Array.isArray(data.detail) ? data.detail.map((d: { msg: string }) => d.msg).join("، ") : data.detail || "ورود انجام نشد.";
         throw new Error(typeof msg === "string" ? msg : "خطا");
       }
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      if (data.access_token) localStorage.setItem("access_token", data.access_token);
+      if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
       window.dispatchEvent(new Event("auth-changed"));
       await refresh();
       toast("با موفقیت وارد شدید.", "success");
-      router.push("/account");
+      goAfterAuth();
     } catch (err) {
       setError(err instanceof Error ? err.message : "ارتباط با سرور برقرار نشد.");
     } finally {
@@ -86,12 +96,12 @@ function AuthInner() {
       const res = await apiFetch(`/auth/otp/verify`, { method: "POST", body: JSON.stringify({ phone: form.phone, code: form.otp_code, full_name: form.full_name }),         _noDedup: true, _noCache: true } as RequestInit);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.detail || "کد نامعتبر است.");
-      localStorage.setItem("access_token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      if (data.access_token) localStorage.setItem("access_token", data.access_token);
+      if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
       window.dispatchEvent(new Event("auth-changed"));
       await refresh();
       toast("ورود با رمز یک‌بار مصرف انجام شد.", "success");
-      router.push("/account");
+      goAfterAuth();
     } catch (err) { setError(err instanceof Error ? err.message : "خطا"); }
     finally { setLoading(false); }
   }

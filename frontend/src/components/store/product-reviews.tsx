@@ -247,6 +247,12 @@ export function ProductReviews({ productId, onCountChange }: Props) {
                 <Stars value={getRating(r)} />
               </div>
               {getText(r) && <p className="mt-3 text-sm leading-7 text-stone-600 dark:text-stone-300">{getText(r)}</p>}
+              {r.admin_reply && (
+                <div className="mt-3 mr-11 rounded-xl bg-emerald-50 p-3 dark:bg-emerald-500/10">
+                  <span className="block text-xs font-bold text-emerald-800 dark:text-emerald-300">پاسخ فروشگاه</span>
+                  <p className="mt-1 text-sm leading-7 text-stone-600 dark:text-stone-300">{r.admin_reply}</p>
+                </div>
+              )}
             </li>
           ))}
         </ul>

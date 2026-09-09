@@ -218,7 +218,7 @@ export function RichTextEditor({ initialValue, onChange, placeholder = "محتو
           </button>
         </div>
       )}
-      <div className="rounded-b-xl border border-char/20 dark:border-white/20">
+      <div className="min-w-0 overflow-x-auto rounded-b-xl border border-char/20 bg-white text-char dark:border-white/20 dark:bg-[#1c1a18] dark:text-white/85">
         <EditorContent editor={editor} />
       </div>
     </div>

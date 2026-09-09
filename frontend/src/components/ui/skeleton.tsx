@@ -53,7 +53,7 @@ export const ShimmerCard = ({ className = "" }: { className?: string }) => {
   );
 };
 
-export const TableSkeleton = ({ rows = 3, cols = 4 }: { rows?: number; cols?: number }) => {
+export const TableSkeleton = ({ rows = 3 }: { rows?: number; cols?: number }) => {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, i) => (

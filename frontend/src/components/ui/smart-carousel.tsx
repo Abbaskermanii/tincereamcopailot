@@ -141,11 +141,34 @@ export function SmartCarousel({
 
   return (
     <div
-      className={cn("group/carousel relative", className)}
+      className={cn("group/carousel relative flex flex-col", className)}
       ref={containerRef}
       onMouseEnter={() => autoPlayMs && setPaused(true)}
       onMouseLeave={() => autoPlayMs && setPaused(false)}
     >
+      {/* Carousel navigation - always visible */}
+      {(canPrev || canNext) && (
+        <div className="mb-3 flex items-center justify-start gap-2">
+          <button
+            type="button"
+            onClick={() => scrollByCards(-1)}
+            disabled={!canPrev}
+            aria-label="قبلی"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-char/10 bg-surface text-char-soft shadow-sm transition-all duration-200 hover:bg-lajvard hover:text-white hover:border-lajvard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lajvard disabled:opacity-30 disabled:pointer-events-none dark:border-white/10 dark:bg-[#262320] dark:text-white/60 dark:hover:bg-lajvard-soft dark:hover:text-char"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polyline points="9 18 15 12 9 6" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollByCards(1)}
+            disabled={!canNext}
+            aria-label="بعدی"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-char/10 bg-surface text-char-soft shadow-sm transition-all duration-200 hover:bg-lajvard hover:text-white hover:border-lajvard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lajvard disabled:opacity-30 disabled:pointer-events-none dark:border-white/10 dark:bg-[#262320] dark:text-white/60 dark:hover:bg-lajvard-soft dark:hover:text-char"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><polyline points="15 18 9 12 15 6" /></svg>
+          </button>
+        </div>
+      )}
       <div
         ref={trackRef}
         className="no-scrollbar flex items-stretch snap-x snap-mandatory overflow-x-auto scroll-smooth pb-1"
@@ -166,51 +189,6 @@ export function SmartCarousel({
         ))}
       </div>
 
-      {/* Navigation arrows — desktop hover */}
-      {items.length > 2 && (
-        <>
-          <button
-            type="button"
-            aria-label="قبلی"
-            onClick={() => scrollByCards(-1)}
-            className={cn(
-              "absolute -right-3 top-1/2 z-10 -translate-y-1/2",
-              "flex h-9 w-9 items-center justify-center rounded-full",
-              "border border-char/10 bg-surface/95 text-char-soft shadow-md backdrop-blur-sm",
-              "transition-all duration-200",
-              "hover:bg-lajvard hover:text-white hover:border-lajvard",
-              "dark:border-white/10 dark:bg-[#262320]/95 dark:text-white/60",
-              "dark:hover:bg-lajvard-soft dark:hover:text-char",
-              "opacity-0 group-hover/carousel:opacity-100 max-lg:hidden",
-              canPrev ? "cursor-pointer" : "pointer-events-none opacity-0",
-            )}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            aria-label="بعدی"
-            onClick={() => scrollByCards(1)}
-            className={cn(
-              "absolute -left-3 top-1/2 z-10 -translate-y-1/2",
-              "flex h-9 w-9 items-center justify-center rounded-full",
-              "border border-char/10 bg-surface/95 text-char-soft shadow-md backdrop-blur-sm",
-              "transition-all duration-200",
-              "hover:bg-lajvard hover:text-white hover:border-lajvard",
-              "dark:border-white/10 dark:bg-[#262320]/95 dark:text-white/60",
-              "dark:hover:bg-lajvard-soft dark:hover:text-char",
-              "opacity-0 group-hover/carousel:opacity-100 max-lg:hidden",
-              canNext ? "cursor-pointer" : "pointer-events-none opacity-0",
-            )}
-          >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-        </>
-      )}
     </div>
   );
 }

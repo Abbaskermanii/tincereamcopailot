@@ -3,7 +3,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ShopProductGrid } from "@/components/store/shop-product-grid";
-import { ShopFilters, ShopMobileFilters, ShopSidebar } from "@/components/store/shop-filters";
+import { ShopMobileFilters, ShopSidebar } from "@/components/store/shop-filters";
 
 export const metadata: Metadata = {
   title: "فروشگاه",

@@ -28,6 +28,8 @@ export default function AdminArticlesPage() {
   const [tab, setTab] = useState<"all" | "draft" | "published">("all");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailMeta, setDetailMeta] = useState<{author_name?:string;created_at?:string;updated_at?:string}|null>(null);
   const [deleting, setDeleting] = useState<Article | null>(null);
   const [form, setForm] = useState<ArticleForm>({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", tags: "", cover_url: null, category_id: "" });
 
@@ -43,7 +45,23 @@ export default function AdminArticlesPage() {
   });
 
   const openCreate = () => { setForm({ title: "", slug: "", excerpt: "", body: "", published_at: "", is_published: false, meta_title: "", meta_description: "", tags: "", cover_url: null, category_id: "" }); setCreating(true); };
-  const openEdit = (a: Article) => { setForm({ title: a.title, slug: a.slug, excerpt: a.excerpt ?? "", body: a.body, published_at: a.published_at ? a.published_at.slice(0, 10) : "", is_published: a.is_published, meta_title: a.meta_title ?? "", meta_description: a.meta_description ?? "", tags: (a.tags ?? []).join("، "), cover_url: a.cover_url ?? null, category_id: a.category_id ?? "" }); setEditing(a); };
+  const openEdit = async (a: Article) => {
+    setEditing(a);
+    setDetailLoading(true);
+    setDetailMeta(null);
+    setForm({ title: a.title, slug: a.slug, excerpt: a.excerpt ?? "", body: "", published_at: a.published_at ? a.published_at.slice(0, 10) : "", is_published: a.is_published, meta_title: a.meta_title ?? "", meta_description: a.meta_description ?? "", tags: "", cover_url: a.cover_url ?? null, category_id: a.category_id ?? "" });
+    try {
+      const res = await fetch(`/admin/articles/${a.id}`);
+      if (!res.ok) throw new Error("fetch failed");
+      const detail = await res.json();
+      setForm(f => ({ ...f, body: detail.body ?? "", meta_title: detail.meta_title ?? "", meta_description: detail.meta_description ?? "", tags: typeof detail.tags === "string" ? detail.tags : (Array.isArray(detail.tags) ? detail.tags.join("\u060C ") : "") }));
+      setDetailMeta({ author_name: detail.author_name, created_at: detail.created_at, updated_at: detail.updated_at });
+    } catch {
+      /* detail fetch failed - form partial */
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const submit = async () => {
     const body = { ...form, published_at: form.published_at || null, cover_url: form.cover_url || null, category_id: form.category_id || null };
@@ -111,6 +129,13 @@ export default function AdminArticlesPage() {
       <Modal open={creating || editing !== null} onClose={() => { setCreating(false); setEditing(null); }} title={editing ? "ویرایش مقاله" : "مقاله جدید"} wide>
         <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
+        {editing && detailMeta && (
+          <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 rounded-lg border border-char/10 bg-char/5 px-4 py-2 text-xs text-char-soft dark:border-white/10 dark:bg-white/5 dark:text-white/50">
+            {detailMeta.author_name && <span>نویسنده: {detailMeta.author_name}</span>}
+            {detailMeta.created_at && <span>تاریخ ساخت: {detailMeta.created_at?.slice(0,10)}</span>}
+            {detailMeta.updated_at && <span>آخرین ویرایش: {detailMeta.updated_at?.slice(0,10)}</span>}
+          </div>
+        )}
             <Field label="عنوان" required>
               <TextInput value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value, slug: form.slug || slugify(e.target.value) })} required />
             </Field>
@@ -157,7 +182,7 @@ export default function AdminArticlesPage() {
           <Field label="برچسب‌ها" hint="با ویرگول جدا کنید — برای سئو و صفحهٔ مقاله">
             <TextInput value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} placeholder="لقاب دست‌ساز، ماگ، کرج" />
           </Field>
-          <FormActions onCancel={() => { setCreating(false); setEditing(null); }} busy={busy} />
+          <FormActions onCancel={() => { setCreating(false); setEditing(null); }} busy={busy || detailLoading} />
         </form>
       </Modal>
 

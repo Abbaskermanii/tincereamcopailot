@@ -132,26 +132,26 @@ class TestAuth:
         # register
         r = await client.post("/api/v1/auth/register", json={"email": email, "password": "Secret123!", "full_name": "Auth Test"})
         assert r.status_code == 201, r.text
-        data = r.json()
-        assert "access_token" in data and "refresh_token" in data
-        tok = data["access_token"]
+        # tokens are delivered via httponly cookies only, not the JSON body
+        assert "access_token" not in r.json() and "refresh_token" not in r.json()
+        assert r.cookies.get("tinceram_access") is not None
+        assert r.cookies.get("tinceram_refresh") is not None
         # me
-        r = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {tok}"})
+        r = await client.get("/api/v1/auth/me")
         assert r.status_code == 200
         assert r.json()["email"] == email.lower()
         # login
         r = await client.post("/api/v1/auth/login", json={"email": email, "password": "Secret123!"})
         assert r.status_code == 200
         # refresh
-        refresh = data["refresh_token"]
-        r = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+        r = await client.post("/api/v1/auth/refresh", json={})
         assert r.status_code == 200
-        new_tok = r.json()["access_token"]
+        assert "access_token" not in r.json()
         # logout (requires auth)
-        r = await client.post("/api/v1/auth/logout", json={"refresh_token": refresh}, headers={"Authorization": f"Bearer {new_tok}"})
+        r = await client.post("/api/v1/auth/logout", json={})
         assert r.status_code == 200
         # refresh after logout should fail (revoked)
-        r = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+        r = await client.post("/api/v1/auth/refresh", json={})
         assert r.status_code == 401
 
     async def test_login_invalid(self, client):
@@ -194,7 +194,8 @@ class TestAuth:
             code = body["debug_code"]
             r = await client.post("/api/v1/auth/otp/verify", json={"phone": phone, "code": code})
             assert r.status_code == 200
-            assert "access_token" in r.json()
+            assert "access_token" not in r.json()
+            assert r.cookies.get("tinceram_access") is not None
 
     async def test_password_reset(self, client, monkeypatch):
         import app.api.v1.auth as auth_mod

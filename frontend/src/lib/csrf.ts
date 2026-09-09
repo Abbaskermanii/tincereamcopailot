@@ -1,10 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-interface CsrfToken {
-  token: string;
-  expiresAt: number;
-}
-
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER = "X-CSRF-Token";
 const CSRF_EXPIRY = 15 * 60 * 1000; // 15 minutes

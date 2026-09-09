@@ -17,6 +17,10 @@ import { faNum, faPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { mediaUrl } from "@/lib/api";
 
+const faToEn = (v: string) =>
+  v.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+   .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+
 /* ————— Stepper definition ————— */
 
 const STEPS = [
@@ -110,7 +114,7 @@ export default function AdminProductEditorPage() {
       if (!form.category_id) errors.category_id = "انتخاب دسته الزامی است.";
     }
     if (key === "pricing") {
-      if (!form.price || Number(form.price) <= 0) errors.price = "قیمت فروش الزامی است.";
+      if (!form.price || Number(faToEn(form.price)) <= 0) errors.price = "قیمت فروش الزامی است.";
       if (!form.sku.trim()) errors.sku = "کد محصول (SKU) الزامی است.";
     }
     setFieldErrors(errors);
@@ -127,11 +131,11 @@ export default function AdminProductEditorPage() {
       const created = await mutate<{ id: string }>("/admin/products", {
         method: "POST",
         body: JSON.stringify({
-          name: form.name, slug: form.slug, sku: form.sku, price: Number(form.price) || 0,
+          name: form.name, slug: form.slug, sku: form.sku, price: Number(faToEn(form.price)) || 0,
           category_id: form.category_id,
           description: form.description, short_description: form.short_description || null,
-          stock_qty: Number(form.stock_qty) || 0, is_active: form.is_active,
-          compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : null,
+          stock_qty: Number(faToEn(form.stock_qty)) || 0, is_active: form.is_active,
+          compare_at_price: form.compare_at_price ? Number(faToEn(form.compare_at_price)) : null,
         }),
         successMessage: "محصول ایجاد شد.",
       });
@@ -141,15 +145,15 @@ export default function AdminProductEditorPage() {
       return true;
     }
     if (!effectiveProductId) return false;
-    const ok = await mutate(`/admin/products/${effectiveProductId}`, {
+const ok = await mutate(`/admin/products/${effectiveProductId}`, {
       method: "PATCH",
       body: JSON.stringify({
-        name: form.name, slug: form.slug, sku: form.sku, category_id: form.category_id,
+        name: form.name, slug: form.sku, category_id: form.category_id,
         description: form.description, short_description: form.short_description || null,
-        stock_qty: Number(form.stock_qty) || 0, is_active: form.is_active,
-        compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : null,
+        price: Number(faToEn(form.price)) || 0, stock_qty: Number(faToEn(form.stock_qty)) || 0, is_active: form.is_active,
+        compare_at_price: form.compare_at_price ? Number(faToEn(form.compare_at_price)) : null,
         material: form.material || null, dimensions: form.dimensions || null,
-        weight_grams: Number(form.weight_grams) || 0,
+        weight_grams: Number(faToEn(form.weight_grams)) || 0,
         meta_title: form.meta_title || null, meta_description: form.meta_description || null,
       }),
       successMessage: "ذخیره شد.",
@@ -476,7 +480,7 @@ function ProductVariants({ productId }: { productId: string }) {
     const body = {
       name: form.name, sku: form.sku, price_delta: Number(form.price_delta) || 0,
       absolute_price: form.absolute_price ? Number(form.absolute_price) : null,
-      stock_qty: Number(form.stock_qty) || 0, is_active: form.is_active, image_url: form.image_url,
+      stock_qty: Number(faToEn(form.stock_qty)) || 0, is_active: form.is_active, image_url: form.image_url,
     };
     const ok = editing
       ? await mutate(`/admin/variants/${editing.id}`, { method: "PATCH", body: JSON.stringify(body), successMessage: "وارینت ذخیره شد." })
@@ -529,7 +533,7 @@ function ProductVariants({ productId }: { productId: string }) {
           <Field label="کد (SKU)" required hint="برای هر وارینت یکتا باشد">
             <TextInput value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required />
           </Field>
-          <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="افزوده بر قیمت پایه (تومان)">
               <TextInput type="number" value={form.price_delta} onChange={(e) => setForm({ ...form, price_delta: e.target.value })} />
             </Field>

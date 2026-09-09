@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { User, Shield, Mail, Phone, MapPin, Activity, ExternalLink, ChevronDown, Plus, Settings } from "lucide-react";
+import { User, Shield, Mail, Phone, MapPin, Activity, ExternalLink, Settings } from "lucide-react";
 import { ConfirmDialog, DataTable, EmptyState, Field, FormActions, Modal, PageHeader, Pagination, StatusBadge, Toolbar, Toggle } from "@/components/admin/kit";
 import { useAdminMutation, useAdminResource } from "@/lib/admin-hooks";
 import { mediaUrl } from "@/lib/api";
@@ -37,10 +37,7 @@ type Role = "admin" | "editor" | "customer";
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<"all" | "active" | "pending">("all");
-  const [creating, setCreating] = useState(false);
-  const [editing, setEditing] = useState<User | null>(null);
   const [deleting, setDeleting] = useState<User | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
   const [showDetail, setShowDetail] = useState<User | null>(null);
   const [showSettings, setShowSettings] = useState<User | null>(null);
 
@@ -48,7 +45,7 @@ export default function AdminUsersPage() {
   const { data: statsData } = useAdminResource<UserStats>("/admin/users/stats");
   const { mutate, busy } = useAdminMutation();
 
-  if (statsData) setStats(statsData);
+  const stats = statsData;
 
   const filtered = (users ?? []).filter((u) => {
     if (tab === "active" && !u.is_active) return false;
@@ -56,14 +53,6 @@ export default function AdminUsersPage() {
     if (search && !u.full_name.includes(search) && !u.email.includes(search)) return false;
     return true;
   });
-
-  const openCreate = () => {
-    setCreating(true);
-  };
-
-  const openEdit = (u: User) => {
-    setEditing(u);
-  };
 
   const openDetail = (u: User) => {
     setShowDetail(u);
@@ -74,12 +63,13 @@ export default function AdminUsersPage() {
   };
 
   const submit = async () => {
-    if (editing) {
-      await mutate(`/admin/users/${editing.id}`, { method: "PATCH", body: JSON.stringify({ is_active: editing.is_active }), successMessage: "وضعیت کاربر تغییر کرد." });
-    }
-    setEditing(null);
-    setCreating(false);
-    void reload();
+    if (!showSettings) return;
+    const ok = await mutate(`/admin/users/${showSettings.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ role: showSettings.role, is_active: showSettings.is_active }),
+      successMessage: "تنظیمات کاربر ذخیره شد.",
+    });
+    if (ok) { setShowSettings(null); void reload(); }
   };
 
   const toggleStatus = async (u: User) => {
@@ -111,18 +101,7 @@ export default function AdminUsersPage() {
       <PageHeader
         title="کاربران"
         description={`${filtered.length} کاربر`}
-        action={
-          <>
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="min-h-[44px] rounded-xl bg-lajvard px-4 text-sm text-white hover:bg-lajvard-deep dark:bg-lajvard-soft dark:text-char"
-            >
-              <Plus className="ml-1 inline h-4 w-4" />
-              افزودن کاربر
-            </button>
-          </>
-        }
+
       />
 
       {stats && (
@@ -199,15 +178,7 @@ export default function AdminUsersPage() {
           icon={<User className="h-12 w-12" />}
           title="هیچ کاربری یافت نشد"
           description="کاربران می‌توانند از طریق فرم ثبت‌نام به این بخش اضافه شوند."
-          action={
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="min-h-[44px] rounded-xl bg-lajvard px-4 text-sm text-white dark:bg-lajvard-soft dark:text-char"
-            >
-              + افزودن کاربر جدید
-            </button>
-          }
+
         />
       ) : (
         <DataTable

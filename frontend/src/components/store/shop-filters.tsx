@@ -19,7 +19,7 @@ interface ShopFiltersProps {
     in_stock_only?: string;
   };
   searchQuery?: string;
-  totalProducts: number;
+  totalProducts?: number;
 }
 
 const SORT_OPTIONS = [
@@ -148,10 +148,9 @@ function ActiveChips({ activeFilters, categories, pathname, params }: { activeFi
 
 /* ————— Desktop sidebar (right column) ————— */
 
-export function ShopSidebar({ categories, currentSort, activeFilters, searchQuery, totalProducts }: ShopFiltersProps) {
+export function ShopSidebar({ categories, currentSort, activeFilters, searchQuery }: ShopFiltersProps) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const activeCategory = categories.find((c) => c.slug === activeFilters.category);
 
   return (
     <aside className="sticky top-24 hidden w-64 shrink-0 self-start space-y-6 lg:block" aria-label="فیلتر محصولات">
@@ -309,11 +308,3 @@ export function ShopMobileFilters({ categories, currentSort, activeFilters, sear
 }
 
 /* Backwards-compatible combined export */
-export function ShopFilters(props: ShopFiltersProps) {
-  return (
-    <>
-      <ShopSidebar {...props} />
-      <ShopMobileFilters {...props} />
-    </>
-  );
-}

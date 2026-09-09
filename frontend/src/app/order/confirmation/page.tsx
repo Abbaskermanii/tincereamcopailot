@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ClearCartOnConfirm } from "./clear-cart";
+import { AddressSnapshotBlock } from "./address-snapshot";
 
 export const metadata: Metadata = {
   title: "ثبت سفارش موفق",
@@ -33,6 +34,10 @@ export default async function OrderConfirmationPage({
             <p className="mt-4 leading-8 text-char-soft dark:text-ink-soft">
               وضعیت پرداخت را می‌توانید همین حالا یا بعداً با شمارهٔ سفارش پیگیری کنید.
             </p>
+
+            {/* Address snapshot — client component, SSR-safe via useEffect */}
+            <AddressSnapshotBlock />
+
             <div className="mt-8 flex justify-center gap-3">
               <Link
                 href={`/track?order=${orderNumber}`}

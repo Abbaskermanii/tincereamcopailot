@@ -28,7 +28,7 @@ export type ProductVariant = {
 };
 
 export interface ProductViewProduct {
-  id: number;
+  id: number | string;
   slug: string;
   name: string;
   price: number;

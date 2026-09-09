@@ -496,6 +496,8 @@ def fulfil_order(order_id: str, payload: OrderFulfilIn, user: User = Depends(req
     session.add(order)
     session.commit()
     session.refresh(order)
+    from app.api.v1.auth import notify_user
+    notify_user(session, str(order.user_id), "order", "بروزرسانی وضعیت سفارش", f"وضعیت سفارش شما به «{order.status.value}» تغییر یافت.", link="/account?tab=orders")
     cache_delete_pattern("products:*")
     return {"ok": True, "status": order.status.value}
 
@@ -756,6 +758,8 @@ SETTING_DEFINITIONS: list[dict] = [
     {"key": "tax_rate_percent", "group": "store", "label": "مالیات (٪)", "type": "number", "default": "0"},
     {"key": "shipping_note", "group": "store", "label": "یادداشت ارسال", "type": "text", "default": ""},
     {"key": "gift_fee", "group": "store", "label": "هزینه بسته‌بندی هدیه", "type": "number", "default": "30000"},
+    {"key": "welcome_notification_title", "group": "general", "label": "متن اعلان خوشآمد (عنوان)", "type": "string", "default": "خوش آمدید به تنسِرام"},
+    {"key": "welcome_notification_body", "group": "general", "label": "متن اعلان خوشآمد (متن)", "type": "text", "default": "حساب شما ساخته شد. وضعیت سفارشها و تخفیفها را در پروفایل دنبال کنید."},
 ]
 SETTING_GROUPS = [
     {"key": "general", "label": "عمومی"},
@@ -769,7 +773,7 @@ SETTING_GROUPS = [
 @admin.get("/products/{product_id}/images")
 def admin_product_images(product_id: str, _: None = _require_perm("products"), session: Session = Depends(get_session)):
     rows = session.exec(
-        select(ProductImage).where(ProductImage.product_id == product_id).order_by(ProductImage.sort_order)  # type: ignore[arg-type]
+        select(ProductImage).where(ProductImage.product_id == product_id).order_by(ProductImage.is_primary.desc(), ProductImage.sort_order)  # type: ignore[arg-type]
     ).all()
     return [
         {"id": i.id, "url": i.url, "alt_text": i.alt_text, "sort_order": i.sort_order, "is_primary": i.is_primary}
@@ -1032,3 +1036,51 @@ class NavigationItemIn(BaseModel):
     is_active: bool = True
     open_in_new_tab: bool = False
 
+
+# ============================ Notifications (admin sender) ============================
+
+
+class NotificationSendIn(BaseModel):
+    title: str = Field(min_length=2, max_length=200)
+    body: str = ""
+    user_ids: list[str] | None = None
+    all_users: bool = False
+
+
+@admin.post("/notifications", status_code=201)
+def send_notifications(payload: NotificationSendIn, _: User = Depends(admin_user), session: Session = Depends(get_session)):
+    from app.models import Notification
+
+    if payload.all_users:
+        targets = [u.id for u in session.exec(select(User)).all()]
+    else:
+        targets = [uid for uid in (payload.user_ids or []) if session.get(User, uid)]
+    if not targets:
+        raise HTTPException(400, "حداقل یک کاربر مقصد انتخاب کنید.")
+    for uid in targets:
+        session.add(
+            Notification(user_id=uid, title=payload.title, body=payload.body)
+        )
+    session.commit()
+    return {"ok": True, "sent": len(targets)}
+
+
+@admin.get("/notifications")
+def list_notifications(
+    offset: int = 0,
+    limit: int = Query(50, le=100),
+    _: User = Depends(admin_user),
+    session: Session = Depends(get_session),
+):
+    from app.models import Notification
+
+    rows = session.exec(
+        select(Notification).order_by(Notification.created_at.desc()).offset(offset).limit(limit)  # type: ignore[arg-type]
+    ).all()
+    return [
+        {
+            "id": n.id, "user_id": n.user_id, "type": n.type, "title": n.title,
+            "body": n.body, "link": n.link, "is_read": n.is_read, "created_at": n.created_at,
+        }
+        for n in rows
+    ]

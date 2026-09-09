@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { Package, ShoppingCart, Truck, ShieldCheck, Star } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export function EmptyCartState() {

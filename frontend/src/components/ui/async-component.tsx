@@ -11,12 +11,6 @@ interface AsyncComponentProps<T> {
   errorComponent?: React.ReactNode;
 }
 
-interface State<T> {
-  data: T | null;
-  isLoading: boolean;
-  error: Error | null;
-}
-
 export function AsyncComponent<T>({
   fetchFn,
   fallback,

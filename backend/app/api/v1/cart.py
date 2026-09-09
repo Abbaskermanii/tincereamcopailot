@@ -3,12 +3,31 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
+from datetime import datetime, timedelta, timezone
+
+
 
 from app.api.v1.auth import current_user
 from app.db.session import get_session
 from app.models import CartItem, Product, ProductVariant, User
 
 router = APIRouter(prefix="/cart", tags=["cart"])
+
+CART_EXPIRY = timedelta(minutes=15)
+
+
+def _purge_expired(user_id, session):
+    """Lazy-purge cart items older than CART_EXPIRY."""
+    cutoff = datetime.now(timezone.utc) - CART_EXPIRY
+    expired = session.exec(
+        select(CartItem).where(CartItem.user_id == user_id, CartItem.created_at < cutoff)
+    ).all()  # type: ignore[arg-type]
+    for item in expired:
+        session.delete(item)
+    if expired:
+        session.commit()
+
+
 
 
 class CartAddIn(BaseModel):
@@ -66,6 +85,8 @@ def _to_out(item: CartItem, session: Session) -> dict:
 
 @router.get("", response_model=list[dict])
 def list_cart(user: User = Depends(current_user), session: Session = Depends(get_session)):
+    _purge_expired(user.id, session)
+
     items = session.exec(select(CartItem).where(CartItem.user_id == user.id).order_by(CartItem.created_at)).all()  # type: ignore[arg-type]
     return [_to_out(i, session) for i in items]
 
@@ -101,6 +122,7 @@ def add_to_cart(payload: CartAddIn, user: User = Depends(current_user), session:
         if stock < new_qty:
             raise HTTPException(409, "موجودی کافی نیست.")
         existing.quantity = new_qty
+        existing.created_at = datetime.now(timezone.utc)  # reset expiry on merge
         session.add(existing)
         session.commit()
         session.refresh(existing)
@@ -129,6 +151,8 @@ def update_cart_item(item_id: str, payload: CartUpdateIn, user: User = Depends(c
     if stock < payload.quantity:
         raise HTTPException(409, "موجودی کافی نیست.")
     item.quantity = payload.quantity
+    item.created_at = datetime.now(timezone.utc)  # reset expiry timer on update
+
     session.add(item)
     session.commit()
     session.refresh(item)
@@ -180,6 +204,7 @@ def merge_guest_cart(payload: CartMergeIn, user: User = Depends(current_user), s
             if stock < new_qty:
                 new_qty = stock
             existing.quantity = new_qty
+            existing.created_at = datetime.now(timezone.utc)  # reset expiry on merge
             session.add(existing)
         else:
             # Clamp to stock

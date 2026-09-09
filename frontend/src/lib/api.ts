@@ -124,10 +124,10 @@ export const api = {
         product_name?: string | null;
         product_slug?: string | null;
       }>
-    >("/reviews/latest", 300).then((r) => r ?? []),
+    >(`/reviews/latest?limit=${Math.min(limit, 12)}`, 300).then((r) => r ?? []),
   products: (
     params: Record<string, string | number | boolean | undefined>,
-    revalidate = 90,
+    revalidate = 0,
   ) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
@@ -151,7 +151,7 @@ export const api = {
         images: ProductImage[];
         variants: ProductVariant[];
       }
-    >(`/products/${slug}`),
+    >(`/products/${slug}`, 0),
   articles: () => get<Array<{ id: string; title: string; slug: string; excerpt?: string; body?: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number }>>("/articles", 180),
   article: (slug: string) => get<{ id: string; title: string; slug: string; excerpt?: string; body: string; published_at?: string; cover_url?: string | null; category_name?: string | null; author_name?: string | null; author_avatar_url?: string | null; reading_time_minutes?: number; tags?: string[] }>(`/articles/${slug}`, 300),
   articleCategories: () => get<Array<{ id: string; name: string; slug: string }>>("/article-categories", 300),

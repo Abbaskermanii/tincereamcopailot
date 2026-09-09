@@ -56,7 +56,7 @@ def _detail(p: Product, variants: list[ProductVariant] | None = None) -> dict:
                 "sort_order": i.sort_order,
                 "is_primary": i.is_primary,
             }
-            for i in sorted(p.images, key=lambda x: x.sort_order)
+            for i in sorted(p.images, key=lambda x: (not x.is_primary, x.sort_order))
         ],
         "variants": [
             {

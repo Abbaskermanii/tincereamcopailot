@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timedelta
 from app.compat import UTC
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session, select
@@ -74,6 +74,7 @@ class OtpVerifyIn(BaseModel):
     phone: str = Field(pattern=r"^09\d{9}$")
     code: str = Field(min_length=4, max_length=8)
     full_name: str = ""
+    purpose: OtpPurpose = OtpPurpose.login
 
 
 class AddressIn(BaseModel):
@@ -170,14 +171,14 @@ def current_user(
 ) -> User:
     token = _resolve_token(credentials, request)
     if not token:
-        raise HTTPException(401, "احراز هویت لازم است.", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(401, "Ø§Ø­Ø±Ø§Ø² Ù‡ÙˆÛŒØª Ù„Ø§Ø²Ù… Ø§Ø³Øª.", headers={"WWW-Authenticate": "Bearer"})
     try:
         payload = decode_token(token)
     except Exception as exc:
-        raise HTTPException(401, "توکن نامعتبر است.") from exc
+        raise HTTPException(401, "ØªÙˆÚ©Ù† Ù†Ø§Ù…Ø¹ØªØ¨Ø± Ø§Ø³Øª.") from exc
     user = session.get(User, payload["sub"])
     if not user or not user.is_active:
-        raise HTTPException(401, "کاربر یافت نشد.")
+        raise HTTPException(401, "Ú©Ø§Ø±Ø¨Ø± ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     return user
 
 
@@ -200,14 +201,14 @@ def optional_user(
 
 def admin_user(user: User = Depends(current_user)) -> User:
     if not user.is_admin:
-        raise HTTPException(403, "دسترسی مدیر لازم است.")
+        raise HTTPException(403, "Ø¯Ø³ØªØ±Ø³ÛŒ Ù…Ø¯ÛŒØ± Ù„Ø§Ø²Ù… Ø§Ø³Øª.")
     return user
 
 
 @router.post("/register", status_code=201, dependencies=[Depends(rate_limit("register", 10, 3600))])
 def register(payload: RegisterIn, response: Response, session: Session = Depends(get_session)):
     if session.exec(select(User).where(User.email == payload.email.lower())).first():
-        raise HTTPException(409, "ایمیل قبلاً ثبت شده است.")
+        raise HTTPException(409, "Ø§ÛŒÙ…ÛŒÙ„ Ù‚Ø¨Ù„Ø§Ù‹ Ø«Ø¨Øª Ø´Ø¯Ù‡ Ø§Ø³Øª.")
     user = User(
         email=payload.email.lower(),
         password_hash=hash_password(payload.password),
@@ -217,7 +218,19 @@ def register(payload: RegisterIn, response: Response, session: Session = Depends
     session.add(user)
     session.commit()
     session.refresh(user)
-    return {"user": user, **_tokens(user, session, response)}
+    # پیام خوشآمد برای ورود اول (قابل تنظیم از پنل مدیریت)
+    try:
+        from app.models import Setting
+        _t = session.exec(select(Setting).where(Setting.key == "welcome_notification_title")).first()
+        _wt = _t.value if _t else "خوش آمدید به تنسِرام"
+        _b = session.exec(select(Setting).where(Setting.key == "welcome_notification_body")).first()
+        _wb = _b.value if _b else "حساب شما ساخته شد. وضعیت سفارشها و تخفیفها را در پروفایل دنبال کنید."
+        from app.services.notifications import create_notification
+        create_notification(session, user.id, _wt, _wb)
+    except Exception:
+        pass
+    _tokens(user, session, response)  # tokens delivered via httponly cookies only
+    return {"user": user}
 
 
 @router.post("/login", dependencies=[Depends(rate_limit("login", 10, 300))])
@@ -226,7 +239,7 @@ def login(payload: LoginIn, response: Response, session: Session = Depends(get_s
     now = datetime.now(UTC)
     s = get_settings()
     if user and user.locked_until and _ensure_aware(user.locked_until) > now:
-        raise HTTPException(423, f"حساب شما موقتاً قفل شده است. {s.login_lock_minutes} دقیقه دیگر تلاش کنید.")
+        raise HTTPException(423, f"Ø­Ø³Ø§Ø¨ Ø´Ù…Ø§ Ù…ÙˆÙ‚ØªØ§Ù‹ Ù‚ÙÙ„ Ø´Ø¯Ù‡ Ø§Ø³Øª. {s.login_lock_minutes} Ø¯Ù‚ÛŒÙ‚Ù‡ Ø¯ÛŒÚ¯Ø± ØªÙ„Ø§Ø´ Ú©Ù†ÛŒØ¯.")
     if not user or not user.password_hash or not verify_password(payload.password, user.password_hash):
         if user:
             user.failed_login_attempts += 1
@@ -235,31 +248,33 @@ def login(payload: LoginIn, response: Response, session: Session = Depends(get_s
                 user.failed_login_attempts = 0
             session.add(user)
             session.commit()
-        raise HTTPException(401, "ایمیل یا رمز عبور نادرست است.")
+        raise HTTPException(401, "Ø§ÛŒÙ…ÛŒÙ„ ÛŒØ§ Ø±Ù…Ø² Ø¹Ø¨ÙˆØ± Ù†Ø§Ø¯Ø±Ø³Øª Ø§Ø³Øª.")
     user.failed_login_attempts = 0
     user.locked_until = None
     session.add(user)
-    return {"user": user, **_tokens(user, session, response)}
+    _tokens(user, session, response)  # tokens delivered via httponly cookies only
+    return {"user": user}
 
 
 @router.post("/refresh")
 def refresh(payload: RefreshIn, request: Request, response: Response, session: Session = Depends(get_session)):
     raw = payload.refresh_token or request.cookies.get(REFRESH_COOKIE)
     if not raw:
-        raise HTTPException(401, "توکن تازه‌سازی یافت نشد.")
+        raise HTTPException(401, "ØªÙˆÚ©Ù† ØªØ§Ø²Ù‡â€ŒØ³Ø§Ø²ÛŒ ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     try:
         claims = decode_token(raw, expected_type="refresh")
     except Exception as exc:
-        raise HTTPException(401, "توکن نامعتبر است.") from exc
+        raise HTTPException(401, "ØªÙˆÚ©Ù† Ù†Ø§Ù…Ø¹ØªØ¨Ø± Ø§Ø³Øª.") from exc
     row = session.exec(select(RefreshToken).where(RefreshToken.token_hash == _hash(raw))).first()
     if not row or row.revoked_at or (_ensure_aware(row.expires_at) <= datetime.now(UTC)):
-        raise HTTPException(401, "توکن منقضی یا لغو شده است.")
+        raise HTTPException(401, "ØªÙˆÚ©Ù† Ù…Ù†Ù‚Ø¶ÛŒ ÛŒØ§ Ù„ØºÙˆ Ø´Ø¯Ù‡ Ø§Ø³Øª.")
     row.revoked_at = datetime.now(UTC)
     session.add(row)
     user = session.get(User, claims["sub"])
     if not user:
-        raise HTTPException(401, "کاربر یافت نشد.")
-    return {"user": user, **_tokens(user, session, response)}
+        raise HTTPException(401, "Ú©Ø§Ø±Ø¨Ø± ÛŒØ§ÙØª Ù†Ø´Ø¯.")
+    _tokens(user, session, response)  # tokens delivered via httponly cookies only
+    return {"user": user}
 
 
 @router.post("/logout")
@@ -287,7 +302,7 @@ async def otp_request(payload: OtpRequestIn, session: Session = Depends(get_sess
     if payload.purpose == OtpPurpose.login:
         existing = session.exec(select(User).where(User.phone == payload.phone)).first()
         if existing and not existing.is_active:
-            raise HTTPException(403, "حساب شما غیرفعال است.")
+            raise HTTPException(403, "Ø­Ø³Ø§Ø¨ Ø´Ù…Ø§ ØºÛŒØ±ÙØ¹Ø§Ù„ Ø§Ø³Øª.")
     code = f"{secrets.randbelow(1000000):06d}"
     session.add(
         OtpCode(
@@ -298,12 +313,12 @@ async def otp_request(payload: OtpRequestIn, session: Session = Depends(get_sess
         )
     )
     session.commit()
-    await notifier.send_sms(payload.phone, f"کد ورود شما به تن‌سِرام: {code}")
+    await notifier.send_sms(payload.phone, f"Ú©Ø¯ ÙˆØ±ÙˆØ¯ Ø´Ù…Ø§ Ø¨Ù‡ ØªÙ†â€ŒØ³ÙØ±Ø§Ù…: {code}")
     out: dict = {"ok": True}
     # Hard production guard: debug_code is NEVER returned when ENVIRONMENT=production
     s = get_settings()
     if s.sms_debug and not s.is_production():
-        out["debug_code"] = code  # dev/test only — never in production
+        out["debug_code"] = code  # dev/test only â€” never in production
     return out
 
 
@@ -321,12 +336,12 @@ def otp_verify(payload: OtpVerifyIn, response: Response, session: Session = Depe
     if row and _ensure_aware(row.expires_at) <= datetime.now(UTC):
         row = None
     if not row or row.attempts >= 5:
-        raise HTTPException(400, "کد منقضی شده است. دوباره درخواست کنید.")
+        raise HTTPException(400, "Ú©Ø¯ Ù…Ù†Ù‚Ø¶ÛŒ Ø´Ø¯Ù‡ Ø§Ø³Øª. Ø¯ÙˆØ¨Ø§Ø±Ù‡ Ø¯Ø±Ø®ÙˆØ§Ø³Øª Ú©Ù†ÛŒØ¯.")
     row.attempts += 1
     if row.code_hash != _hash(payload.code):
         session.add(row)
         session.commit()
-        raise HTTPException(400, "کد وارد شده نادرست است.")
+        raise HTTPException(400, "Ú©Ø¯ ÙˆØ§Ø±Ø¯ Ø´Ø¯Ù‡ Ù†Ø§Ø¯Ø±Ø³Øª Ø§Ø³Øª.")
     row.used_at = datetime.now(UTC)
     session.add(row)
 
@@ -334,18 +349,19 @@ def otp_verify(payload: OtpVerifyIn, response: Response, session: Session = Depe
     if not user:
         # phone-first registration: create the account on first OTP login
         if payload.purpose not in (OtpPurpose.login, OtpPurpose.register):
-            raise HTTPException(400, "ابتدا ثبت‌نام کنید.")
+            raise HTTPException(400, "Ø§Ø¨ØªØ¯Ø§ Ø«Ø¨Øªâ€ŒÙ†Ø§Ù… Ú©Ù†ÛŒØ¯.")
         user = User(
             email=f"{payload.phone}@otp.tinceram.local",
-            full_name=payload.full_name or f"کاربر {payload.phone[-4:]}",
+            full_name=payload.full_name or f"Ú©Ø§Ø±Ø¨Ø± {payload.phone[-4:]}",
             phone=payload.phone,
         )
         session.add(user)
         session.commit()
         session.refresh(user)
     if not user.is_active:
-        raise HTTPException(403, "حساب شما غیرفعال است.")
-    return {"user": user, **_tokens(user, session, response)}
+        raise HTTPException(403, "Ø­Ø³Ø§Ø¨ Ø´Ù…Ø§ ØºÛŒØ±ÙØ¹Ø§Ù„ Ø§Ø³Øª.")
+    _tokens(user, session, response)  # tokens delivered via httponly cookies only
+    return {"user": user}
 
 
 # ---------- Password reset (token delivered by email/SMS) ----------
@@ -364,11 +380,11 @@ async def password_reset_request(payload: ResetRequest, session: Session = Depen
         session.commit()
         link = f"{get_settings().next_public_site_url}/auth/reset?token={token}"
         await notifier.send_email(
-            user.email, "بازنشانی رمز عبور — تن‌سِرام",
+            user.email, "Ø¨Ø§Ø²Ù†Ø´Ø§Ù†ÛŒ Ø±Ù…Ø² Ø¹Ø¨ÙˆØ± â€” ØªÙ†â€ŒØ³ÙØ±Ø§Ù…",
             notifier.RTL_EMAIL_SHELL.format(
-                body=f"<p>برای بازنشانی رمز عبور روی لینک زیر کلیک کنید (اعتبار ۱ ساعت):</p>"
-                     f"<p><a href='{link}'>بازنشانی رمز عبور</a></p>"
-                     f"<p style='color:#888;font-size:12px'>اگر شما درخواست نداده‌اید، این ایمیل را نادیده بگیرید.</p>"
+                body=f"<p>Ø¨Ø±Ø§ÛŒ Ø¨Ø§Ø²Ù†Ø´Ø§Ù†ÛŒ Ø±Ù…Ø² Ø¹Ø¨ÙˆØ± Ø±ÙˆÛŒ Ù„ÛŒÙ†Ú© Ø²ÛŒØ± Ú©Ù„ÛŒÚ© Ú©Ù†ÛŒØ¯ (Ø§Ø¹ØªØ¨Ø§Ø± Û± Ø³Ø§Ø¹Øª):</p>"
+                     f"<p><a href='{link}'>Ø¨Ø§Ø²Ù†Ø´Ø§Ù†ÛŒ Ø±Ù…Ø² Ø¹Ø¨ÙˆØ±</a></p>"
+                     f"<p style='color:#888;font-size:12px'>Ø§Ú¯Ø± Ø´Ù…Ø§ Ø¯Ø±Ø®ÙˆØ§Ø³Øª Ù†Ø¯Ø§Ø¯Ù‡â€ŒØ§ÛŒØ¯ØŒ Ø§ÛŒÙ† Ø§ÛŒÙ…ÛŒÙ„ Ø±Ø§ Ù†Ø§Ø¯ÛŒØ¯Ù‡ Ø¨Ú¯ÛŒØ±ÛŒØ¯.</p>"
             ),
         )
     # Do not disclose account existence either way.
@@ -379,10 +395,10 @@ async def password_reset_request(payload: ResetRequest, session: Session = Depen
 def password_reset_confirm(payload: ResetConfirm, session: Session = Depends(get_session)):
     row = session.exec(select(PasswordResetToken).where(PasswordResetToken.token_hash == _hash(payload.token))).first()
     if not row or row.used_at or (_ensure_aware(row.expires_at) <= datetime.now(UTC)):
-        raise HTTPException(400, "توکن بازنشانی نامعتبر است.")
+        raise HTTPException(400, "ØªÙˆÚ©Ù† Ø¨Ø§Ø²Ù†Ø´Ø§Ù†ÛŒ Ù†Ø§Ù…Ø¹ØªØ¨Ø± Ø§Ø³Øª.")
     user = session.get(User, row.user_id)
     if not user:
-        raise HTTPException(400, "کاربر یافت نشد.")
+        raise HTTPException(400, "Ú©Ø§Ø±Ø¨Ø± ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     user.password_hash = hash_password(payload.password)
     user.locked_until = None
     user.failed_login_attempts = 0
@@ -402,22 +418,22 @@ def update_profile(payload: ProfileUpdate, user: User = Depends(current_user), s
         new_email = data["email"].lower()
         clash = session.exec(select(User).where(User.email == new_email, User.id != user.id)).first()
         if clash:
-            raise HTTPException(409, "این ایمیل قبلاً ثبت شده است.")
+            raise HTTPException(409, "Ø§ÛŒÙ† Ø§ÛŒÙ…ÛŒÙ„ Ù‚Ø¨Ù„Ø§Ù‹ Ø«Ø¨Øª Ø´Ø¯Ù‡ Ø§Ø³Øª.")
         user.email = new_email
     if "phone" in data and data["phone"]:
         clash = session.exec(select(User).where(User.phone == data["phone"], User.id != user.id)).first()
         if clash:
-            raise HTTPException(409, "این شماره موبایل قبلاً ثبت شده است.")
+            raise HTTPException(409, "Ø§ÛŒÙ† Ø´Ù…Ø§Ø±Ù‡ Ù…ÙˆØ¨Ø§ÛŒÙ„ Ù‚Ø¨Ù„Ø§Ù‹ Ø«Ø¨Øª Ø´Ø¯Ù‡ Ø§Ø³Øª.")
         user.phone = data["phone"]
     if data.get("full_name") is not None:
         user.full_name = data["full_name"]
     if data.get("password"):
         if not user.password_hash:
-            raise HTTPException(400, "حساب شما با رمز عبور ساخته نشده است.")
+            raise HTTPException(400, "Ø­Ø³Ø§Ø¨ Ø´Ù…Ø§ Ø¨Ø§ Ø±Ù…Ø² Ø¹Ø¨ÙˆØ± Ø³Ø§Ø®ØªÙ‡ Ù†Ø´Ø¯Ù‡ Ø§Ø³Øª.")
         # M6 fix: require current password to prevent stolen JWT takeover
         current = data.get("current_password")
         if not current or not verify_password(current, user.password_hash):
-            raise HTTPException(400, "رمز عبور فعلی نادرست است.")
+            raise HTTPException(400, "Ø±Ù…Ø² Ø¹Ø¨ÙˆØ± ÙØ¹Ù„ÛŒ Ù†Ø§Ø¯Ø±Ø³Øª Ø§Ø³Øª.")
         user.password_hash = hash_password(data["password"])
     session.add(user)
     session.commit()
@@ -469,7 +485,7 @@ def list_users(session: Session = Depends(get_session), offset: int = 0, limit: 
 def delete_user(user_id: str, session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
-        raise HTTPException(404, "کاربر یافت نشد.")
+        raise HTTPException(404, "Ú©Ø§Ø±Ø¨Ø± ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     user.is_active = False
     session.add(user)
     session.commit()
@@ -488,7 +504,7 @@ def admin_update_user(
 ):
     user = session.get(User, user_id)
     if not user:
-        raise HTTPException(404, "کاربر یافت نشد.")
+        raise HTTPException(404, "Ú©Ø§Ø±Ø¨Ø± ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     data = payload.model_dump(exclude_unset=True)
     # never let the last active admin be demoted or deactivated
     if user.is_admin and (data.get("is_admin") is False or data.get("is_active") is False):
@@ -496,7 +512,7 @@ def admin_update_user(
             select(User).where(User.is_admin == True, User.is_active == True, User.id != user.id)  # noqa: E712
         ).all()
         if not other_admins:
-            raise HTTPException(400, "حداقل یک مدیر فعال باید باقی بماند.")
+            raise HTTPException(400, "Ø­Ø¯Ø§Ù‚Ù„ ÛŒÚ© Ù…Ø¯ÛŒØ± ÙØ¹Ø§Ù„ Ø¨Ø§ÛŒØ¯ Ø¨Ø§Ù‚ÛŒ Ø¨Ù…Ø§Ù†Ø¯.")
     for key, value in data.items():
         setattr(user, key, value)
     session.add(user)
@@ -530,7 +546,7 @@ def update_address(address_id: str, payload: AddressIn, user: User = Depends(cur
 def _update_address(address_id: str, payload: AddressIn, user: User, session: Session) -> Address:
     address = session.get(Address, address_id)
     if not address or address.user_id != user.id:
-        raise HTTPException(404, "نشانی یافت نشد.")
+        raise HTTPException(404, "Ù†Ø´Ø§Ù†ÛŒ ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     data = payload.model_dump(exclude_unset=True)
     if data.get("is_default"):
         for row in session.exec(select(Address).where(Address.user_id == user.id)).all():
@@ -549,7 +565,7 @@ def _update_address(address_id: str, payload: AddressIn, user: User, session: Se
 def delete_address(address_id: str, user: User = Depends(current_user), session: Session = Depends(get_session)):
     address = session.get(Address, address_id)
     if not address or address.user_id != user.id:
-        raise HTTPException(404, "نشانی یافت نشد.")
+        raise HTTPException(404, "Ù†Ø´Ø§Ù†ÛŒ ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     session.delete(address)
     session.commit()
     return {"ok": True}
@@ -567,7 +583,7 @@ def wishlist(user: User = Depends(current_user), session: Session = Depends(get_
 @wishlist_router.post("/{product_id}", status_code=201)
 def wishlist_add(product_id: str, user: User = Depends(current_user), session: Session = Depends(get_session)):
     if not session.get(Product, product_id):
-        raise HTTPException(404, "محصول یافت نشد.")
+        raise HTTPException(404, "Ù…Ø­ØµÙˆÙ„ ÛŒØ§ÙØª Ù†Ø´Ø¯.")
     item = session.exec(select(WishlistItem).where(WishlistItem.user_id == user.id, WishlistItem.product_id == product_id)).first()
     if not item:
         item = WishlistItem(user_id=user.id, product_id=product_id)
@@ -583,3 +599,79 @@ def wishlist_remove(product_id: str, user: User = Depends(current_user), session
         session.delete(item)
         session.commit()
     return {"ok": True}
+
+# ============================ Notifications (user) ============================
+
+
+@users_router.post("/me/notifications/read-all")
+def mark_all_notifications_read(
+    user: User = Depends(current_user), session: Session = Depends(get_session)
+):
+    from app.models import Notification
+
+    rows = session.exec(
+        select(Notification).where(
+            Notification.user_id == user.id, Notification.is_read == False  # noqa: E712
+        )
+    ).all()
+    for n in rows:
+        n.is_read = True
+        session.add(n)
+    session.commit()
+    return {"ok": True, "updated": len(rows)}
+
+
+# ============================ User avatar (self-service) ============================
+
+
+@users_router.post("/me/avatar", status_code=201)
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    from app.services.storage import put_image
+
+    allowed = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+    content_type = file.content_type or ""
+    if content_type not in allowed:
+        raise HTTPException(415, "ÙØ±Ù…Øª ØªØµÙˆÛŒØ± Ù¾Ø´ØªÛŒØ¨Ø§Ù†ÛŒ Ù†Ù…ÛŒØ´ÙˆØ¯ (JPGØŒ PNG ÛŒØ§ WebP).")
+    data = await file.read()
+    max_bytes = get_settings().max_avatar_size_mb * 1024 * 1024
+    if len(data) > max_bytes:
+        raise HTTPException(413, f"Ø­Ø¬Ù… ØªØµÙˆÛŒØ± Ø¨Ø§ÛŒØ¯ Ú©Ù…ØªØ± Ø§Ø² {get_settings().max_avatar_size_mb} Ù…Ú¯Ø§Ø¨Ø§ÛŒØª Ø¨Ø§Ø´Ø¯.")
+    object_name = f"avatars/{user.id}/{secrets.token_hex(12)}.{allowed[content_type]}"
+    url = put_image(object_name, data, content_type)
+    user.avatar_url = url
+    session.add(user)
+    session.commit()
+    return {"url": url, "object_name": object_name}
+
+
+@users_router.delete("/me/addresses/{address_id}")
+def delete_my_address(
+    address_id: str,
+    user: User = Depends(current_user),
+    session: Session = Depends(get_session),
+):
+    from app.models import Address
+
+    addr = session.get(Address, address_id)
+    if not addr or addr.user_id != user.id:
+        raise HTTPException(404, "Ù†Ø´Ø§Ù†ÛŒ ÛŒØ§ÙØª Ù†Ø´Ø¯.")
+    session.delete(addr)
+    session.commit()
+    return {"ok": True}
+
+
+# ============================ Notifications (triggers) ============================
+
+
+def notify_user(
+    session: Session, user_id: str, ntype: str, title: str, body: str = "", link: str | None = None
+) -> None:
+    """Small wrapper so api modules can trigger notifications without import cycles."""
+    from app.services.notifications import create_notification
+
+    create_notification(session, user_id, title, body)
+

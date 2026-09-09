@@ -172,7 +172,7 @@ export default async function HomePage() {
       {articles.length > 0 && (
         <Reveal>
           <ArticlesSection
-          eyebrow="مجله آنیمور سرام"
+          eyebrow="مقالات آنیمور سرام"
           title="داستان‌ها و راهنماها"
           subtitle="چیزهایی که ارزش خواندن دارند"
           articles={articles}
